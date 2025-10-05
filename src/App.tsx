@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Modul from './pages/Modul'
+import Project from './pages/Project'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="modul" element={<Modul />} />
+        <Route path="project" element={<Project />} />
       </Route>
     </Routes>
   )

@@ -4,17 +4,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface FileInputProps {
   id?: string;
   label?: string;
   accept?: string;
-  onChange?: (files: { file: File; name: string }[]) => void;
-  value?: { file: File; name: string }[];
+  onChange?: (files: { file: File; name: string; category?: string }[]) => void;
+  value?: { file: File; name: string; category?: string }[];
+  categoryOptions?: { value: string; label: string }[];
+  editableName?: boolean;
 }
 
 const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
-  ({ id, label = 'Pilih file', accept, onChange, value = [] }, ref) => {
+  ({ id, label = 'Pilih file', accept, onChange, value = [], categoryOptions, editableName = true }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
@@ -24,7 +33,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(e.target.files || []);
-      const newFiles = selectedFiles.map(file => ({ file, name: file.name }));
+      const newFiles = selectedFiles.map(file => ({ file, name: file.name, category: '' }));
       onChange?.([...value, ...newFiles]);
       if (inputRef.current) {
         inputRef.current.value = '';
@@ -35,7 +44,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
       e.preventDefault();
       setIsDragOver(false);
       const selectedFiles = Array.from(e.dataTransfer.files);
-      const newFiles = selectedFiles.map(file => ({ file, name: file.name }));
+      const newFiles = selectedFiles.map(file => ({ file, name: file.name, category: '' }));
       onChange?.([...value, ...newFiles]);
     };
 
@@ -60,6 +69,13 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
       onChange?.(newFiles);
     };
 
+    const updateFileCategory = (index: number, category: string) => {
+      const newFiles = value.map((item, i) =>
+        i === index ? { ...item, category } : item
+      );
+      onChange?.(newFiles);
+    };
+
     return (
       <div className="space-y-2">
         {label && <Label htmlFor={id}>{label}</Label>}
@@ -69,14 +85,35 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
               <Card key={index} className="p-3">
                 <div className="flex items-center gap-3">
                   <File className="h-6 w-6 text-muted-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <Input
-                      value={item.name}
-                      onChange={(e) => updateFileName(index, e.target.value)}
-                      className="text-sm h-8"
-                      placeholder="Nama file"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    {editableName ? (
+                      <Input
+                        value={item.name}
+                        onChange={(e) => updateFileName(index, e.target.value)}
+                        className="text-sm h-8"
+                        placeholder="Nama file"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                    )}
+                    {categoryOptions && (
+                      <Select
+                        value={item.category || ''}
+                        onValueChange={(value) => updateFileCategory(index, value)}
+                      >
+                        <SelectTrigger className="w-full h-8">
+                          <SelectValue placeholder="Pilih kategori" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categoryOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <p className="text-xs text-muted-foreground">
                       {(item.file.size / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
