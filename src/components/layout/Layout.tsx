@@ -2,7 +2,7 @@
 
 import { Link } from "react-router-dom";
 import { Outlet } from "react-router-dom";
-import { Home, Code, Briefcase } from "lucide-react";
+import { Home, Code, Briefcase, Users, Shield } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -74,6 +74,29 @@ export default function Layout() {
                   <Link to="/project">
                     <Briefcase />
                     Project
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>User Management</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link to="/user">
+                    <Users />
+                    User
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link to="/role">
+                    <Shield />
+                    Role & Permission
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

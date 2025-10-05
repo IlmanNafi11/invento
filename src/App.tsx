@@ -5,6 +5,8 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Modul from './pages/Modul'
 import Project from './pages/Project'
+import User from './pages/User'
+import Role from './pages/Role'
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="modul" element={<Modul />} />
         <Route path="project" element={<Project />} />
+        <Route path="user" element={<User />} />
+        <Route path="role" element={<Role />} />
       </Route>
     </Routes>
   )
