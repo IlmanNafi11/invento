@@ -2,6 +2,7 @@
 
 import { Link } from "react-router-dom";
 import { Outlet } from "react-router-dom";
+import { Home } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -24,13 +25,21 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { useAppSelector } from "@/hooks/useAppSelector";
+import { useAppDispatch } from "@/hooks/useAppDispatch";
+import { setSidebarOpen } from "@/lib/sidebarSlice";
 
 export default function Layout() {
+  const isOpen = useAppSelector((state) => state.sidebar.open);
+  const dispatch = useAppDispatch();
 
   const sidebarContent = (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader>
-        <h2 className="text-lg font-semibold">Track Fast</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">Invento</h2>
+          <SidebarTrigger />
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -38,7 +47,10 @@ export default function Layout() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link to="/dashboard">
+                    <Home />
+                    Dashboard
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -50,7 +62,6 @@ export default function Layout() {
 
   const headerContent = (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6">
-      <SidebarTrigger className="-ml-1" />
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
         <DropdownMenu>
@@ -74,7 +85,7 @@ export default function Layout() {
   );
 
   return (
-    <SidebarProvider>
+    <SidebarProvider open={isOpen} onOpenChange={(open) => dispatch(setSidebarOpen(open))}>
       {sidebarContent}
       <main className="flex flex-1 flex-col">
         {headerContent}
