@@ -2,7 +2,7 @@
 
 import { Link } from "react-router-dom";
 import { Outlet } from "react-router-dom";
-import { Home } from "lucide-react";
+import { Home, Code, Briefcase } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -18,6 +18,7 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -50,6 +51,29 @@ export default function Layout() {
                   <Link to="/dashboard">
                     <Home />
                     Dashboard
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>File Manager</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link to="/modul">
+                    <Code />
+                    Modul
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link to="/project">
+                    <Briefcase />
+                    Project
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
