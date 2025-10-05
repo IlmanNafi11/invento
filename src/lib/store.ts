@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit'
 import sidebarReducer from './sidebarSlice'
+import roleReducer from './roleSlice'
 
 export const store = configureStore({
   reducer: {
     sidebar: sidebarReducer,
+    role: roleReducer,
   },
 })
 

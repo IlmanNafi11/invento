@@ -18,3 +18,21 @@ export interface ProjectItem {
 }
 
 export type ProjectCategory = 'website' | 'mobile' | 'iot' | 'machine learning' | 'deep learning';
+
+export interface Permission {
+  upload: boolean;
+  update: boolean;
+  view: boolean;
+  delete: boolean;
+}
+
+export interface RoleItem {
+  id: string;
+  name: string;
+  permissions: {
+    project: Permission;
+    modul: Permission;
+    user: Permission;
+  };
+  lastUpdated: Date;
+}
