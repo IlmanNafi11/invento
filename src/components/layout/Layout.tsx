@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Outlet } from "react-router-dom";
 import { Home, Code, Briefcase, Users, Shield } from "lucide-react";
@@ -30,10 +31,14 @@ import {
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setSidebarOpen } from "@/lib/sidebarSlice";
+import { ProfileDialog } from "@/components/common/ProfileDialog";
+import { getInitials } from "@/utils/format";
 
 export default function Layout() {
   const isOpen = useAppSelector((state) => state.sidebar.open);
+  const currentUser = useAppSelector((state) => state.user.currentUser);
   const dispatch = useAppDispatch();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const sidebarContent = (
     <Sidebar collapsible="icon">
@@ -111,16 +116,16 @@ export default function Layout() {
             <div className="flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent cursor-pointer">
               <Avatar className="h-8 w-8">
                 <AvatarImage src="" alt="User" />
-                <AvatarFallback>U</AvatarFallback>
+                <AvatarFallback>{currentUser ? getInitials(currentUser.email) : 'U'}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                <span className="text-sm font-medium">admin@invento.com</span>
-                <span className="text-xs text-muted-foreground">Admin</span>
+                <span className="text-sm font-medium">{currentUser?.email || 'admin@invento.com'}</span>
+                <span className="text-xs text-muted-foreground">{currentUser?.role.name || 'Admin'}</span>
               </div>
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Profil</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setProfileOpen(true)}>Profil</DropdownMenuItem>
             <DropdownMenuItem>Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -131,6 +136,10 @@ export default function Layout() {
   const headerContent = (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6">
       <div className="ml-auto flex items-center gap-2">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src="" alt="User" />
+          <AvatarFallback>{currentUser ? getInitials(currentUser.email) : 'U'}</AvatarFallback>
+        </Avatar>
         <ThemeToggle />
       </div>
     </header>
@@ -145,6 +154,11 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+      <ProfileDialog
+        user={currentUser}
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+      />
     </SidebarProvider>
   );
 }

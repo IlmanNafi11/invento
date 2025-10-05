@@ -13,3 +13,7 @@ export function formatDate(date: Date): string {
     day: 'numeric',
   });
 }
+
+export function getInitials(email: string): string {
+  return email.charAt(0).toUpperCase();
+}

@@ -4,10 +4,12 @@ import type { UserItem } from '@/types';
 
 interface UserState {
   users: UserItem[];
+  currentUser: UserItem | null;
 }
 
 const initialState: UserState = {
   users: mockUsers,
+  currentUser: mockUsers[0], // Assume first user is logged in
 };
 
 const userSlice = createSlice({
@@ -31,8 +33,11 @@ const userSlice = createSlice({
     deleteUser: (state, action: PayloadAction<string>) => {
       state.users = state.users.filter(user => user.id !== action.payload);
     },
+    setCurrentUser: (state, action: PayloadAction<UserItem | null>) => {
+      state.currentUser = action.payload;
+    },
   },
 });
 
-export const { addUser, updateUser, deleteUser } = userSlice.actions;
+export const { addUser, updateUser, deleteUser, setCurrentUser } = userSlice.actions;
 export default userSlice.reducer;
