@@ -36,3 +36,11 @@ export interface RoleItem {
   };
   lastUpdated: Date;
 }
+
+export interface UserItem {
+  id: string;
+  email: string;
+  role: RoleItem;
+  files: FileItem[];
+  createdAt: Date;
+}
