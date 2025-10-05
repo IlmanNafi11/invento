@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
 import { Outlet } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -15,11 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -28,15 +21,11 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-export default function AppLayout() {
-  const [transaksiOpen, setTransaksiOpen] = useState(false);
+export default function Layout() {
 
   const sidebarContent = (
     <Sidebar>
@@ -50,45 +39,6 @@ export default function AppLayout() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link to="/dashboard">Dashboard</Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <Collapsible open={transaksiOpen} onOpenChange={setTransaksiOpen}>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton>
-                      Transaksi
-                      <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild>
-                          <Link to="/recording">Pencatatan</Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild>
-                          <Link to="/transfer">Transfer</Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </Collapsible>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/kantong">Kantong</Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/anggaran">Anggaran</Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/reports">Laporan</Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
