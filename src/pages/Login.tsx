@@ -1,21 +1,55 @@
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
+import { login, clearError } from "@/lib/authSlice";
+import { useAppDispatch, useAppSelector } from "@/hooks/useAppDispatch";
 
-interface LoginForm {
-  email: string;
-  password: string;
-}
+const loginSchema = z.object({
+  email: z.string().email("Format email tidak valid"),
+  password: z.string().min(8, "Password minimal 8 karakter"),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+  const dispatch = useAppDispatch();
+  const { loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
 
-  const onSubmit = () => {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  // Redirect if already authenticated
+  if (isAuthenticated) {
     navigate("/dashboard");
+    return null;
+  }
+
+  const onSubmit = async (data: LoginForm) => {
+    try {
+      await dispatch(login(data)).unwrap();
+      navigate("/dashboard");
+    } catch {
+      // Error is handled by the slice
+    }
+  };
+
+  const handleInputChange = () => {
+    if (error) {
+      dispatch(clearError());
+    }
   };
 
   return (
@@ -26,13 +60,22 @@ export default function Login() {
           <CardDescription>Masuk ke Invento</CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <Alert className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                {...register("email", { required: "Email wajib diisi" })}
+                {...register("email")}
+                onChange={(e) => {
+                  register("email").onChange(e);
+                  handleInputChange();
+                }}
               />
               {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
             </div>
@@ -41,11 +84,24 @@ export default function Login() {
               <Input
                 id="password"
                 type="password"
-                {...register("password", { required: "Password wajib diisi" })}
+                {...register("password")}
+                onChange={(e) => {
+                  register("password").onChange(e);
+                  handleInputChange();
+                }}
               />
               {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
             </div>
-            <Button type="submit" className="w-full">Login</Button>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Login"
+              )}
+            </Button>
           </form>
           <div className="mt-4 text-center">
             <p className="text-sm">

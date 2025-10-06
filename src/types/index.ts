@@ -44,3 +44,56 @@ export interface UserItem {
   files: FileItem[];
   createdAt: Date;
 }
+
+// Auth related types
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface BaseResponse {
+  success: boolean;
+  message: string;
+  code: number;
+  timestamp: string;
+}
+
+export interface AuthSuccessResponse extends BaseResponse {
+  data: AuthResponse;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface ValidationErrorResponse extends BaseResponse {
+  errors: ValidationError[];
+}
+
+export interface ErrorResponse extends BaseResponse {
+  errors?: Record<string, unknown>;
+}
