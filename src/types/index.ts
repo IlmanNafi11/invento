@@ -170,3 +170,39 @@ export interface PermissionItem {
   action: string;
   label: string;
 }
+
+export interface UserListItem {
+  id: number;
+  email: string;
+  role: string;
+  dibuat_pada: string;
+}
+
+export interface UserFile {
+  id: number;
+  nama_file: string;
+  kategori: 'modul' | 'project';
+  download_url: string;
+}
+
+export interface UserListResponse extends BaseResponse {
+  data: {
+    items: UserListItem[];
+    pagination: Pagination;
+  };
+}
+
+export interface UserFilesResponse extends BaseResponse {
+  data: {
+    items: UserFile[];
+    pagination: Pagination;
+  };
+}
+
+export interface UpdateUserRoleRequest {
+  role: string;
+}
+
+export interface SuccessResponse extends BaseResponse {
+  data: null;
+}

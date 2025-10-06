@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Search, Eye, Edit, Trash2, Download, Filter } from 'lucide-react';
 import { toast } from 'sonner';
@@ -62,8 +62,10 @@ import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { formatDate } from '@/utils/format';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
-import { updateUser, deleteUser } from '@/lib/userSlice';
-import type { UserItem, FileItem } from '@/types';
+import { fetchUsers, updateUserRole, deleteUserAsync, fetchUserFiles, clearError } from '@/lib/userSlice';
+import { fetchRoles } from '@/lib/roleSlice';
+import { useDebounce } from '@/hooks/useDebounce';
+import type { UserItem, UserFile } from '@/types';
 
 interface FilterForm {
   role: string;
@@ -83,7 +85,23 @@ export default function User() {
 
   const dispatch = useAppDispatch();
   const users = useAppSelector((state) => state.user.users);
+  const userFiles = useAppSelector((state) => state.user.userFiles);
+  const error = useAppSelector((state) => state.user.error);
   const roles = useAppSelector((state) => state.role.roles);
+
+  const debouncedSearch = useDebounce(search, 500);
+
+  useEffect(() => {
+    dispatch(fetchUsers({ limit: 1000 }));
+    dispatch(fetchRoles({ limit: 1000 }));
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearError());
+    }
+  }, [error, dispatch]);
 
   const filterForm = useForm<FilterForm>({
     defaultValues: {
@@ -108,46 +126,47 @@ export default function User() {
     setIsFilterOpen(false);
   };
 
-  const handleEdit = editForm.handleSubmit((data) => {
+  const handleEdit = editForm.handleSubmit(async (data) => {
     if (editingUser) {
-      const selectedRole = roles.find(role => role.id === Number(data.role));
-      if (selectedRole) {
-        const roleItem = {
-          id: selectedRole.id.toString(),
-          name: selectedRole.nama_role,
-          permissions: {
-            project: { upload: false, update: false, view: false, delete: false },
-            modul: { upload: false, update: false, view: false, delete: false },
-            user: { upload: false, update: false, view: false, delete: false },
-          },
-          lastUpdated: selectedRole.tanggal_diperbarui,
-        };
-        dispatch(updateUser({ ...editingUser, role: roleItem }));
+      try {
+        await dispatch(updateUserRole({ id: parseInt(editingUser.id), role: { role: data.role } })).unwrap();
+        dispatch(fetchUsers({ limit: 1000 }));
         setIsEditOpen(false);
         setEditingUser(null);
         editForm.reset();
         toast.success('User berhasil diperbarui');
+      } catch {
+        // Error is handled in slice
       }
     }
   });
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingUser) {
-      dispatch(deleteUser(deletingUser.id));
-      setIsDeleteOpen(false);
-      setDeletingUser(null);
-      toast.success('User berhasil dihapus');
+      try {
+        await dispatch(deleteUserAsync(parseInt(deletingUser.id))).unwrap();
+        setIsDeleteOpen(false);
+        setDeletingUser(null);
+        toast.success('User berhasil dihapus');
+      } catch {
+        // Error is handled in slice
+      }
     }
   };
 
-  const openViewDialog = (user: UserItem) => {
+  const openViewDialog = async (user: UserItem) => {
     setViewingUser(user);
     setFileSearch('');
+    try {
+      await dispatch(fetchUserFiles({ id: parseInt(user.id), limit: 1000 })).unwrap();
+    } catch {
+      // Error handled in slice
+    }
     setIsViewOpen(true);
   };
 
   const openEditDialog = (user: UserItem) => {
-    editForm.setValue('role', user.role.id);
+    editForm.setValue('role', user.role.name);
     setEditingUser(user);
     setIsEditOpen(true);
   };
@@ -164,27 +183,28 @@ export default function User() {
   const filteredUsers = useMemo(() => {
     let filtered = users;
 
-    if (search) {
+    if (debouncedSearch) {
       filtered = filtered.filter(user =>
-        user.email.toLowerCase().includes(search.toLowerCase())
+        user.email.toLowerCase().includes(debouncedSearch.toLowerCase())
       );
     }
 
     if (filterRole) {
-      filtered = filtered.filter(user => user.role.id === filterRole);
+      filtered = filtered.filter(user => user.role.name === filterRole);
     }
 
     return filtered;
-  }, [search, filterRole, users]);
+  }, [debouncedSearch, filterRole, users]);
+
+  const debouncedFileSearch = useDebounce(fileSearch, 500);
 
   const filteredFiles = useMemo(() => {
-    if (!viewingUser) return [];
-    if (!fileSearch) return viewingUser.files;
-    return viewingUser.files.filter(file =>
-      file.name.toLowerCase().includes(fileSearch.toLowerCase()) ||
-      file.category.toLowerCase().includes(fileSearch.toLowerCase())
+    if (!debouncedFileSearch) return userFiles;
+    return userFiles.filter(file =>
+      file.nama_file.toLowerCase().includes(debouncedFileSearch.toLowerCase()) ||
+      file.kategori.toLowerCase().includes(debouncedFileSearch.toLowerCase())
     );
-  }, [viewingUser, fileSearch]);
+  }, [userFiles, debouncedFileSearch]);
 
   const userColumns: ColumnDef<UserItem>[] = [
     {
@@ -198,7 +218,7 @@ export default function User() {
     {
       accessorKey: 'createdAt',
       header: 'Dibuat Pada',
-      cell: ({ getValue }) => formatDate(getValue<Date>()),
+      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
     },
     {
       id: 'actions',
@@ -231,13 +251,13 @@ export default function User() {
     },
   ];
 
-  const fileColumns: ColumnDef<FileItem>[] = [
+  const fileColumns: ColumnDef<UserFile>[] = [
     {
-      accessorKey: 'name',
+      accessorKey: 'nama_file',
       header: 'Nama File',
     },
     {
-      accessorKey: 'category',
+      accessorKey: 'kategori',
       header: 'Kategori',
     },
     {
@@ -247,7 +267,7 @@ export default function User() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => handleDownload(row.original.name)}
+          onClick={() => handleDownload(row.original.nama_file)}
         >
           <Download className="h-4 w-4" />
         </Button>
@@ -311,9 +331,7 @@ export default function User() {
                                   !field.value && "text-muted-foreground"
                                 )}
                               >
-                                {field.value
-                                  ? roles.find((role) => role.id === Number(field.value))?.nama_role
-                                  : "Pilih role"}
+                                {field.value || "Pilih role"}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </FormControl>
@@ -329,14 +347,14 @@ export default function User() {
                                       key={role.id}
                                       value={role.nama_role}
                                       onSelect={() => {
-                                        filterForm.setValue("role", role.id.toString());
+                                        filterForm.setValue("role", role.nama_role);
                                       }}
                                     >
                                       {role.nama_role}
                                       <Check
                                         className={cn(
                                           "ml-auto",
-                                          role.id === Number(field.value)
+                                          role.nama_role === field.value
                                             ? "opacity-100"
                                             : "opacity-0"
                                         )}
@@ -568,9 +586,7 @@ export default function User() {
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            {field.value
-                              ? roles.find((role) => role.id === Number(field.value))?.nama_role
-                              : "Pilih role"}
+                            {field.value || "Pilih role"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -586,14 +602,14 @@ export default function User() {
                                   key={role.id}
                                   value={role.nama_role}
                                   onSelect={() => {
-                                    editForm.setValue("role", role.id.toString());
+                                    editForm.setValue("role", role.nama_role);
                                   }}
                                 >
                                   {role.nama_role}
                                   <Check
                                     className={cn(
                                       "ml-auto",
-                                      role.id === Number(field.value)
+                                      role.nama_role === field.value
                                         ? "opacity-100"
                                         : "opacity-0"
                                     )}
