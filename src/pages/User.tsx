@@ -110,9 +110,19 @@ export default function User() {
 
   const handleEdit = editForm.handleSubmit((data) => {
     if (editingUser) {
-      const selectedRole = roles.find(role => role.id === data.role);
+      const selectedRole = roles.find(role => role.id === Number(data.role));
       if (selectedRole) {
-        dispatch(updateUser({ ...editingUser, role: selectedRole }));
+        const roleItem = {
+          id: selectedRole.id.toString(),
+          name: selectedRole.nama_role,
+          permissions: {
+            project: { upload: false, update: false, view: false, delete: false },
+            modul: { upload: false, update: false, view: false, delete: false },
+            user: { upload: false, update: false, view: false, delete: false },
+          },
+          lastUpdated: selectedRole.tanggal_diperbarui,
+        };
+        dispatch(updateUser({ ...editingUser, role: roleItem }));
         setIsEditOpen(false);
         setEditingUser(null);
         editForm.reset();
@@ -302,7 +312,7 @@ export default function User() {
                                 )}
                               >
                                 {field.value
-                                  ? roles.find((role) => role.id === field.value)?.name
+                                  ? roles.find((role) => role.id === Number(field.value))?.nama_role
                                   : "Pilih role"}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -317,16 +327,16 @@ export default function User() {
                                   {roles.map((role) => (
                                     <CommandItem
                                       key={role.id}
-                                      value={role.name}
+                                      value={role.nama_role}
                                       onSelect={() => {
-                                        filterForm.setValue("role", role.id);
+                                        filterForm.setValue("role", role.id.toString());
                                       }}
                                     >
-                                      {role.name}
+                                      {role.nama_role}
                                       <Check
                                         className={cn(
                                           "ml-auto",
-                                          role.id === field.value
+                                          role.id === Number(field.value)
                                             ? "opacity-100"
                                             : "opacity-0"
                                         )}
@@ -559,7 +569,7 @@ export default function User() {
                             )}
                           >
                             {field.value
-                              ? roles.find((role) => role.id === field.value)?.name
+                              ? roles.find((role) => role.id === Number(field.value))?.nama_role
                               : "Pilih role"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -574,16 +584,16 @@ export default function User() {
                               {roles.map((role) => (
                                 <CommandItem
                                   key={role.id}
-                                  value={role.name}
+                                  value={role.nama_role}
                                   onSelect={() => {
-                                    editForm.setValue("role", role.id);
+                                    editForm.setValue("role", role.id.toString());
                                   }}
                                 >
-                                  {role.name}
+                                  {role.nama_role}
                                   <Check
                                     className={cn(
                                       "ml-auto",
-                                      role.id === field.value
+                                      role.id === Number(field.value)
                                         ? "opacity-100"
                                         : "opacity-0"
                                     )}

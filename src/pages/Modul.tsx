@@ -58,7 +58,7 @@ import {
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
-import { mockFiles } from '@/data/mock/files';
+const mockFiles: FileItem[] = [];
 import { formatFileSize, formatDate } from '@/utils/format';
 import type { FileItem, FileType } from '@/types';
 

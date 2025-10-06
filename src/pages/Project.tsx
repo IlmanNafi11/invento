@@ -59,7 +59,7 @@ import {
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
-import { mockProjects } from '@/data/mock/projects';
+const mockProjects: ProjectItem[] = [];
 import { formatFileSize, formatDate } from '@/utils/format';
 import type { ProjectItem, ProjectCategory } from '@/types';
 

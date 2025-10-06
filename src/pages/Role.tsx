@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useReactTable,
@@ -44,16 +44,20 @@ import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { formatDate } from '@/utils/format';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
-import { addRole, updateRole, deleteRole } from '@/lib/roleSlice';
-import type { RoleItem, Permission } from '@/types';
+import {
+  fetchRoles,
+  fetchPermissions,
+  fetchRoleDetail,
+  createRole,
+  updateRole,
+  deleteRole,
+  clearError
+} from '@/lib/roleSlice';
+import type { RoleListItem, ResourcePermissions } from '@/types';
 
 interface RoleForm {
-  name: string;
-  permissions: {
-    project: Permission;
-    modul: Permission;
-    user: Permission;
-  };
+  nama_role: string;
+  permissions: Record<string, string[]>;
 }
 
 export default function Role() {
@@ -61,123 +65,112 @@ export default function Role() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
-  const [deletingRole, setDeletingRole] = useState<RoleItem | null>(null);
+  const [editingRole, setEditingRole] = useState<RoleListItem | null>(null);
+  const [deletingRole, setDeletingRole] = useState<RoleListItem | null>(null);
 
   const dispatch = useAppDispatch();
-  const roles = useAppSelector((state) => state.role.roles);
+  const { roles, permissions, loading, error, currentRole } = useAppSelector((state) => state.role);
+
+  useEffect(() => {
+    dispatch(fetchRoles());
+    dispatch(fetchPermissions());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearError());
+    }
+  }, [error, dispatch]);
 
   const createForm = useForm<RoleForm>({
     defaultValues: {
-      name: '',
-      permissions: {
-        project: {
-          upload: false,
-          update: false,
-          view: false,
-          delete: false,
-        },
-        modul: {
-          upload: false,
-          update: false,
-          view: false,
-          delete: false,
-        },
-        user: {
-          upload: false,
-          update: false,
-          view: false,
-          delete: false,
-        },
-      },
+      nama_role: '',
+      permissions: {},
     },
   });
 
   const editForm = useForm<RoleForm>({
     defaultValues: {
-      name: '',
-      permissions: {
-        project: {
-          upload: false,
-          update: false,
-          view: false,
-          delete: false,
-        },
-        modul: {
-          upload: false,
-          update: false,
-          view: false,
-          delete: false,
-        },
-        user: {
-          upload: false,
-          update: false,
-          view: false,
-          delete: false,
-        },
-      },
+      nama_role: '',
+      permissions: {},
     },
   });
 
-  const countPermissions = (permissions: { project: Permission; modul: Permission; user: Permission }) => {
-    const projectCount = Object.values(permissions.project).filter(Boolean).length;
-    const modulCount = Object.values(permissions.modul).filter(Boolean).length;
-    const userCount = Object.values(permissions.user).filter(Boolean).length;
-    return projectCount + modulCount + userCount;
-  };
+  useEffect(() => {
+    if (currentRole && isEditOpen) {
+      editForm.setValue('nama_role', currentRole.nama_role);
+      const permissionsObj: Record<string, string[]> = {};
+      currentRole.permissions.forEach(perm => {
+        permissionsObj[perm.resource] = perm.actions;
+      });
+      editForm.setValue('permissions', permissionsObj);
+    }
+  }, [currentRole, isEditOpen, editForm]);
 
-  const handleCreate = createForm.handleSubmit((data) => {
-    dispatch(addRole(data));
-    setIsCreateOpen(false);
-    createForm.reset();
-    toast.success('Role berhasil ditambahkan');
+  const handleCreate = createForm.handleSubmit(async (data) => {
+    try {
+      await dispatch(createRole(data)).unwrap();
+      setIsCreateOpen(false);
+      createForm.reset();
+      toast.success('Role berhasil ditambahkan');
+      dispatch(fetchRoles());
+    } catch {
+      // Error is handled by the slice
+    }
   });
 
-  const handleEdit = editForm.handleSubmit((data) => {
+  const handleEdit = editForm.handleSubmit(async (data) => {
     if (editingRole) {
-      dispatch(updateRole({ ...editingRole, ...data }));
-      setIsEditOpen(false);
-      setEditingRole(null);
-      editForm.reset();
-      toast.success('Role berhasil diperbarui');
+      try {
+        await dispatch(updateRole({ id: editingRole.id, data })).unwrap();
+        setIsEditOpen(false);
+        setEditingRole(null);
+        editForm.reset();
+        toast.success('Role berhasil diperbarui');
+      } catch {
+        // Error is handled by the slice
+      }
     }
   });
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingRole) {
-      dispatch(deleteRole(deletingRole.id));
-      setIsDeleteOpen(false);
-      setDeletingRole(null);
-      toast.success('Role berhasil dihapus');
+      try {
+        await dispatch(deleteRole(deletingRole.id)).unwrap();
+        setIsDeleteOpen(false);
+        setDeletingRole(null);
+        toast.success('Role berhasil dihapus');
+      } catch {
+        // Error is handled by the slice
+      }
     }
   };
 
-  const openEditDialog = (role: RoleItem) => {
-    editForm.setValue('name', role.name);
-    editForm.setValue('permissions', role.permissions);
+  const openEditDialog = (role: RoleListItem) => {
+    dispatch(fetchRoleDetail(role.id));
     setEditingRole(role);
     setIsEditOpen(true);
   };
 
-  const openDeleteDialog = (role: RoleItem) => {
+  const openDeleteDialog = (role: RoleListItem) => {
     setDeletingRole(role);
     setIsDeleteOpen(true);
   };
 
-  const columns: ColumnDef<RoleItem>[] = [
+  const columns: ColumnDef<RoleListItem>[] = [
     {
-      accessorKey: 'name',
+      accessorKey: 'nama_role',
       header: 'Role',
     },
     {
-      id: 'permissionCount',
+      accessorKey: 'jumlah_permission',
       header: 'Jumlah Permission',
-      cell: ({ row }) => countPermissions(row.original.permissions),
     },
     {
-      accessorKey: 'lastUpdated',
+      accessorKey: 'tanggal_diperbarui',
       header: 'Tanggal Diperbarui',
-      cell: ({ getValue }) => formatDate(getValue<Date>()),
+      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
     },
     {
       id: 'actions',
@@ -188,6 +181,7 @@ export default function Role() {
             variant="ghost"
             size="sm"
             onClick={() => openEditDialog(row.original)}
+            disabled={loading}
           >
             <Edit className="h-4 w-4" />
           </Button>
@@ -195,6 +189,7 @@ export default function Role() {
             variant="ghost"
             size="sm"
             onClick={() => openDeleteDialog(row.original)}
+            disabled={loading}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -206,7 +201,7 @@ export default function Role() {
   const filteredData = useMemo(() => {
     if (!search) return roles;
     return roles.filter(role =>
-      role.name.toLowerCase().includes(search.toLowerCase())
+      role.nama_role.toLowerCase().includes(search.toLowerCase())
     );
   }, [search, roles]);
 
@@ -219,44 +214,52 @@ export default function Role() {
   });
 
   const PermissionCard = ({
-    title,
     resource,
     form,
   }: {
-    title: string;
-    resource: 'project' | 'modul' | 'user';
+    resource: ResourcePermissions;
     form: ReturnType<typeof useForm<RoleForm>>;
-  }) => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {(['upload', 'update', 'view', 'delete'] as const).map((action) => (
-          <FormField
-            key={action}
-            control={form.control}
-            name={`permissions.${resource}.${action}`}
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <Label className="text-sm font-normal capitalize">
-                  {action === 'upload' ? 'Upload' :
-                   action === 'update' ? 'Perbarui' :
-                   action === 'view' ? 'Lihat' : 'Hapus'} {title.toLowerCase()}
-                </Label>
-              </FormItem>
-            )}
-          />
-        ))}
-      </CardContent>
-    </Card>
-  );
+  }) => {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">{resource.name}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {resource.permissions.map((perm) => (
+            <FormField
+              key={perm.action}
+              control={form.control}
+              name={`permissions.${resource.name}`}
+              render={({ field }) => {
+                const currentValues = field.value || [];
+                const isChecked = currentValues.includes(perm.action);
+
+                return (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={(checked) => {
+                          const newValues = checked
+                            ? [...currentValues, perm.action]
+                            : currentValues.filter((v: string) => v !== perm.action);
+                          field.onChange(newValues);
+                        }}
+                      />
+                    </FormControl>
+                    <Label className="text-sm font-normal">
+                      {perm.label}
+                    </Label>
+                  </FormItem>
+                );
+              }}
+            />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -272,8 +275,8 @@ export default function Role() {
               className="pl-9"
             />
           </div>
-          <Button onClick={() => setIsCreateOpen(true)} className="shrink-0">
-            <Plus className="h-4 w-4 mr-2" />
+          <Button onClick={() => setIsCreateOpen(true)} className="shrink-0" disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
             Tambah Role
           </Button>
         </div>
@@ -360,7 +363,7 @@ export default function Role() {
             <form onSubmit={handleCreate} className="space-y-6">
               <FormField
                 control={createForm.control}
-                name="name"
+                name="nama_role"
                 render={({ field }) => (
                   <FormItem>
                     <Label>Nama Role</Label>
@@ -370,14 +373,17 @@ export default function Role() {
                   </FormItem>
                 )}
               />
-              <PermissionCard title="Project" resource="project" form={createForm} />
-              <PermissionCard title="Modul" resource="modul" form={createForm} />
-              <PermissionCard title="User" resource="user" form={createForm} />
+              {permissions?.map((resource) => (
+                <PermissionCard key={resource.name} resource={resource} form={createForm} />
+              ))}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit">Simpan</Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Simpan
+                </Button>
               </div>
             </form>
           </Form>
@@ -393,7 +399,7 @@ export default function Role() {
             <form onSubmit={handleEdit} className="space-y-6">
               <FormField
                 control={editForm.control}
-                name="name"
+                name="nama_role"
                 render={({ field }) => (
                   <FormItem>
                     <Label>Nama Role</Label>
@@ -403,14 +409,17 @@ export default function Role() {
                   </FormItem>
                 )}
               />
-              <PermissionCard title="Project" resource="project" form={editForm} />
-              <PermissionCard title="Modul" resource="modul" form={editForm} />
-              <PermissionCard title="User" resource="user" form={editForm} />
+              {permissions?.map((resource) => (
+                <PermissionCard key={resource.name} resource={resource} form={editForm} />
+              ))}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit">Simpan</Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Simpan
+                </Button>
               </div>
             </form>
           </Form>
@@ -421,7 +430,7 @@ export default function Role() {
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         onConfirm={handleDelete}
-        itemName={deletingRole?.name}
+        itemName={deletingRole?.nama_role}
       />
     </div>
   );

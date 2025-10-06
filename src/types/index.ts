@@ -3,7 +3,7 @@ export interface FileItem {
   name: string;
   category: string;
   size: number;
-  lastUpdated: Date;
+  lastUpdated: string;
 }
 
 export type FileType = 'pdf' | 'docx' | 'ppt';
@@ -13,7 +13,7 @@ export interface ProjectItem {
   name: string;
   category: ProjectCategory;
   size: number;
-  lastUpdated: Date;
+  lastUpdated: string;
   semester: string;
 }
 
@@ -34,7 +34,7 @@ export interface RoleItem {
     modul: Permission;
     user: Permission;
   };
-  lastUpdated: Date;
+  lastUpdated: string;
 }
 
 export interface UserItem {
@@ -42,7 +42,7 @@ export interface UserItem {
   email: string;
   role: RoleItem;
   files: FileItem[];
-  createdAt: Date;
+  createdAt: string;
 }
 
 // Auth related types
@@ -96,4 +96,77 @@ export interface ValidationErrorResponse extends BaseResponse {
 
 export interface ErrorResponse extends BaseResponse {
   errors?: Record<string, unknown>;
+}
+
+export interface ApiPermission {
+  resource: string;
+  actions: string[];
+}
+
+export interface Role {
+  id: number;
+  nama_role: string;
+  permissions: ApiPermission[];
+  jumlah_permission: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoleListItem {
+  id: number;
+  nama_role: string;
+  jumlah_permission: number;
+  tanggal_diperbarui: string;
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total_items: number;
+  total_pages: number;
+}
+
+export interface RoleListResponse extends BaseResponse {
+  data: {
+    items: RoleListItem[];
+    pagination: Pagination;
+  };
+}
+
+export interface RoleDetailResponse extends BaseResponse {
+  data: Role;
+}
+
+export interface RoleCreateRequest {
+  nama_role: string;
+  permissions: Record<string, string[]>;
+}
+
+export interface RoleCreateResponse extends BaseResponse {
+  data: Role;
+}
+
+export interface RoleUpdateRequest {
+  nama_role: string;
+  permissions: Record<string, string[]>;
+}
+
+export interface RoleUpdateResponse extends BaseResponse {
+  data: Role;
+}
+
+export interface PermissionsResponse extends BaseResponse {
+  data: {
+    items: ResourcePermissions[];
+  };
+}
+
+export interface ResourcePermissions {
+  name: string;
+  permissions: PermissionItem[];
+}
+
+export interface PermissionItem {
+  action: string;
+  label: string;
 }

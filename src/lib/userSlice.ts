@@ -1,5 +1,4 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { mockUsers } from '@/data/mock/users';
 import type { UserItem } from '@/types';
 
 interface UserState {
@@ -8,8 +7,8 @@ interface UserState {
 }
 
 const initialState: UserState = {
-  users: mockUsers,
-  currentUser: mockUsers[0], // Assume first user is logged in
+  users: [],
+  currentUser: null,
 };
 
 const userSlice = createSlice({
@@ -20,7 +19,7 @@ const userSlice = createSlice({
       const newUser: UserItem = {
         ...action.payload,
         id: Date.now().toString(),
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
       };
       state.users.push(newUser);
     },
