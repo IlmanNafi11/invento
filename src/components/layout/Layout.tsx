@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
 import { Home, Code, Briefcase, Users, Shield } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,14 +32,40 @@ import {
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setSidebarOpen } from "@/lib/sidebarSlice";
+import { clearUser } from "@/lib/userSlice";
 import { ProfileDialog } from "@/components/common/ProfileDialog";
 import { getInitials } from "@/utils/format";
+import { authAPI } from "@/lib/auth";
 
 export default function Layout() {
   const isOpen = useAppSelector((state) => state.sidebar.open);
   const currentUser = useAppSelector((state) => state.user.currentUser);
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [shouldNavigateToLogin, setShouldNavigateToLogin] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout API failed:', error);
+    }
+
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    dispatch(clearUser());
+    toast.success('Berhasil logout');
+
+    setShouldNavigateToLogin(true);
+  };
+
+  useEffect(() => {
+    if (shouldNavigateToLogin) {
+      navigate('/login');
+      setShouldNavigateToLogin(false);
+    }
+  }, [shouldNavigateToLogin, navigate]);
 
   const sidebarContent = (
     <Sidebar collapsible="icon">
@@ -126,7 +153,7 @@ export default function Layout() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setProfileOpen(true)}>Profil</DropdownMenuItem>
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>
@@ -136,10 +163,18 @@ export default function Layout() {
   const headerContent = (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6">
       <div className="ml-auto flex items-center gap-2">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src="" alt="User" />
-          <AvatarFallback>{currentUser ? getInitials(currentUser.email) : 'U'}</AvatarFallback>
-        </Avatar>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Avatar className="h-8 w-8 cursor-pointer">
+              <AvatarImage src="" alt="User" />
+              <AvatarFallback>{currentUser ? getInitials(currentUser.email) : 'U'}</AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setProfileOpen(true)}>Profil</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <ThemeToggle />
       </div>
     </header>

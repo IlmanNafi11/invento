@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +17,7 @@ interface DeleteConfirmationProps {
   title?: string;
   description?: string;
   itemName?: string;
+  loading?: boolean;
 }
 
 export function DeleteConfirmation({
@@ -25,6 +27,7 @@ export function DeleteConfirmation({
   title = 'Konfirmasi Hapus',
   description = 'Apakah Anda yakin ingin menghapus item ini?',
   itemName,
+  loading = false,
 }: DeleteConfirmationProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -37,8 +40,11 @@ export function DeleteConfirmation({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Batal</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Hapus</AlertDialogAction>
+          <AlertDialogCancel disabled={loading}>Batal</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Hapus
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

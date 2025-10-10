@@ -17,7 +17,7 @@ export interface ProjectItem {
   semester: string;
 }
 
-export type ProjectCategory = 'website' | 'mobile' | 'iot' | 'machine learning' | 'deep learning';
+export type ProjectCategory = 'website' | 'mobile' | 'iot' | 'machine_learning' | 'deep_learning';
 
 export interface Permission {
   upload: boolean;
@@ -205,4 +205,53 @@ export interface UpdateUserRoleRequest {
 
 export interface SuccessResponse extends BaseResponse {
   data: null;
+}
+
+export interface Project {
+  id: number;
+  nama_project: string;
+  kategori: ProjectCategory;
+  semester: number;
+  ukuran: string;
+  path_file: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectListItem {
+  id: number;
+  nama_project: string;
+  kategori: ProjectCategory;
+  semester: number;
+  ukuran: string;
+  terakhir_diperbarui: string;
+}
+
+export interface ProjectListResponse extends BaseResponse {
+  data: {
+    items: ProjectListItem[];
+    pagination: Pagination;
+  };
+}
+
+export interface ProjectCreateResponse extends BaseResponse {
+  data: {
+    items: Project[];
+  };
+}
+
+export interface ProjectUpdateResponse extends BaseResponse {
+  data: Project;
+}
+
+export interface ProjectCreateRequest {
+  files: File[];
+  nama_project: string[];
+  semester: number[];
+}
+
+export interface ProjectUpdateRequest {
+  nama_project?: string;
+  semester?: number;
+  file?: File;
 }

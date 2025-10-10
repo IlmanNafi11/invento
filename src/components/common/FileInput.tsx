@@ -16,8 +16,8 @@ interface FileInputProps {
   id?: string;
   label?: string;
   accept?: string;
-  onChange?: (files: { file: File; name: string; category?: string }[]) => void;
-  value?: { file: File; name: string; category?: string }[];
+  onChange?: (files: { file: File; name: string; category?: string; semester?: number; existingFileSize?: string }[]) => void;
+  value?: { file: File; name: string; category?: string; semester?: number; existingFileSize?: string }[];
   categoryOptions?: { value: string; label: string }[];
   editableName?: boolean;
 }
@@ -33,7 +33,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(e.target.files || []);
-      const newFiles = selectedFiles.map(file => ({ file, name: file.name, category: '' }));
+      const newFiles = selectedFiles.map(file => ({ file, name: '', category: '', semester: undefined }));
       onChange?.([...value, ...newFiles]);
       if (inputRef.current) {
         inputRef.current.value = '';
@@ -44,7 +44,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
       e.preventDefault();
       setIsDragOver(false);
       const selectedFiles = Array.from(e.dataTransfer.files);
-      const newFiles = selectedFiles.map(file => ({ file, name: file.name, category: '' }));
+      const newFiles = selectedFiles.map(file => ({ file, name: '', category: '', semester: undefined }));
       onChange?.([...value, ...newFiles]);
     };
 
@@ -76,6 +76,13 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
       onChange?.(newFiles);
     };
 
+    const updateFileSemester = (index: number, semester: number) => {
+      const newFiles = value.map((item, i) =>
+        i === index ? { ...item, semester } : item
+      );
+      onChange?.(newFiles);
+    };
+
     return (
       <div className="space-y-2">
         {label && <Label htmlFor={id}>{label}</Label>}
@@ -91,7 +98,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                         value={item.name}
                         onChange={(e) => updateFileName(index, e.target.value)}
                         className="text-sm h-8"
-                        placeholder="Nama file"
+                        placeholder="Nama project"
                       />
                     ) : (
                       <p className="text-sm font-medium truncate">{item.name}</p>
@@ -105,7 +112,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                           <SelectValue placeholder="Pilih kategori" />
                         </SelectTrigger>
                         <SelectContent>
-                          {categoryOptions.map((option) => (
+                          {categoryOptions.filter(option => option.value !== '').map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>
@@ -113,8 +120,23 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                         </SelectContent>
                       </Select>
                     )}
+                    <Select
+                      value={item.semester ? item.semester.toString() : undefined}
+                      onValueChange={(value) => updateFileSemester(index, parseInt(value))}
+                    >
+                      <SelectTrigger className="w-full h-8">
+                        <SelectValue placeholder="Pilih semester" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 8 }, (_, i) => i + 1).map((semester) => (
+                          <SelectItem key={semester} value={semester.toString()}>
+                            Semester {semester}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <p className="text-xs text-muted-foreground">
-                      {(item.file.size / 1024 / 1024).toFixed(2)} MB
+                      {item.existingFileSize || `${(item.file.size / 1024 / 1024).toFixed(2)} MB`}
                     </p>
                   </div>
                   <Button

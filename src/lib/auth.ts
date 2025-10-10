@@ -2,6 +2,7 @@ import type {
   AuthRequest,
   RegisterRequest,
   AuthSuccessResponse,
+  SuccessResponse,
   ErrorResponse,
   ValidationErrorResponse,
 } from '@/types';
@@ -43,6 +44,16 @@ class AuthAPI {
     return this.request<AuthSuccessResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
+    });
+  }
+
+  async logout(): Promise<SuccessResponse> {
+    const token = localStorage.getItem('access_token');
+    return this.request<SuccessResponse>('/auth/logout', {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
   }
 }

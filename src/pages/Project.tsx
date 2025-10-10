@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Upload, Search, Filter, Edit, Trash2 } from 'lucide-react';
+import { Upload, Search, Filter, Edit, Trash2, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useReactTable,
@@ -53,35 +53,37 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
-const mockProjects: ProjectItem[] = [];
-import { formatFileSize, formatDate } from '@/utils/format';
-import type { ProjectItem, ProjectCategory } from '@/types';
+import { formatDate } from '@/utils/format';
+import { useDebounce } from '@/hooks/useDebounce';
+import { projectAPI } from '@/lib/projectAPI';
+import type { ProjectListItem, ProjectCategory, ErrorResponse, ValidationErrorResponse } from '@/types';
 
 const categoryOptions: { value: ProjectCategory; label: string }[] = [
   { value: '' as ProjectCategory, label: 'Semua' },
   { value: 'website', label: 'Website' },
   { value: 'mobile', label: 'Mobile' },
   { value: 'iot', label: 'IoT' },
-  { value: 'machine learning', label: 'Machine Learning' },
-  { value: 'deep learning', label: 'Deep Learning' },
+  { value: 'machine_learning', label: 'Machine Learning' },
+  { value: 'deep_learning', label: 'Deep Learning' },
 ];
 
 const semesterOptions: { value: string; label: string }[] = [
   { value: '', label: 'Semua' },
-  { value: 'Semester 1', label: 'Semester 1' },
-  { value: 'Semester 2', label: 'Semester 2' },
-  { value: 'Semester 3', label: 'Semester 3' },
-  { value: 'Semester 4', label: 'Semester 4' },
-  { value: 'Semester 5', label: 'Semester 5' },
-  { value: 'Semester 6', label: 'Semester 6' },
-  { value: 'Semester 7', label: 'Semester 7' },
-  { value: 'Semester 8', label: 'Semester 8' },
+  { value: '1', label: 'Semester 1' },
+  { value: '2', label: 'Semester 2' },
+  { value: '3', label: 'Semester 3' },
+  { value: '4', label: 'Semester 4' },
+  { value: '5', label: 'Semester 5' },
+  { value: '6', label: 'Semester 6' },
+  { value: '7', label: 'Semester 7' },
+  { value: '8', label: 'Semester 8' },
 ];
 
 interface FilterForm {
@@ -90,16 +92,22 @@ interface FilterForm {
 }
 
 interface ProjectForm {
-  files: { file: File; name: string; category: string }[];
+  files: { file: File; name: string; category: string; semester?: number; existingFileSize?: string }[];
 }
 
 export default function Project() {
   const [search, setSearch] = useState('');
+  const [projects, setProjects] = useState<ProjectListItem[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total_items: 0, total_pages: 0 });
   const [filterOpen, setFilterOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [deletingItem, setDeletingItem] = useState<ProjectItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<ProjectListItem | null>(null);
+  const [isCreateLoading, setIsCreateLoading] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [editingItem, setEditingItem] = useState<ProjectListItem | null>(null);
 
   const [pendingSemester, setPendingSemester] = useState<string>('');
   const [pendingCategory, setPendingCategory] = useState<ProjectCategory | ''>('');
@@ -133,56 +141,15 @@ export default function Project() {
     name: 'category',
   });
 
-  const handleApplyFilter = () => {
-    filterForm.setValue('semester', pendingSemester);
-    filterForm.setValue('category', pendingCategory);
-    setFilterOpen(false);
-  };
+  const debouncedSearch = useDebounce(search, 500);
 
-  const handleResetFilter = () => {
-    setPendingSemester('');
-    setPendingCategory('');
-    filterForm.setValue('semester', '');
-    filterForm.setValue('category', '');
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleCreate = createForm.handleSubmit((_data) => {
-    setIsCreateOpen(false);
-    createForm.reset();
-    toast.success('Project berhasil ditambahkan');
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleEdit = editForm.handleSubmit((_data) => {
-    setIsEditOpen(false);
-    editForm.reset();
-    toast.success('Project berhasil diperbarui');
-  });
-
-  const handleDelete = () => {
-    setIsDeleteOpen(false);
-    setDeletingItem(null);
-    toast.success('Project berhasil dihapus');
-  };
-
-  const openEditDialog = (item: ProjectItem) => {
-    editForm.setValue('files', [{ file: new File([], item.name), name: item.name, category: item.category }]);
-    setIsEditOpen(true);
-  };
-
-  const openDeleteDialog = (item: ProjectItem) => {
-    setDeletingItem(item);
-    setIsDeleteOpen(true);
-  };
-
-  const columns: ColumnDef<ProjectItem>[] = [
+  const columns: ColumnDef<ProjectListItem>[] = [
     {
-      accessorKey: 'name',
+      accessorKey: 'nama_project',
       header: 'Nama Project',
     },
     {
-      accessorKey: 'category',
+      accessorKey: 'kategori',
       header: 'Kategori',
       cell: ({ getValue }) => {
         const cat = getValue<ProjectCategory>();
@@ -190,20 +157,26 @@ export default function Project() {
       },
     },
     {
-      accessorKey: 'size',
+      accessorKey: 'ukuran',
       header: 'Ukuran',
-      cell: ({ getValue }) => formatFileSize(getValue<number>()),
     },
     {
-      accessorKey: 'lastUpdated',
+      accessorKey: 'terakhir_diperbarui',
       header: 'Tanggal Diperbarui',
-      cell: ({ getValue }) => formatDate(getValue<Date>()),
+      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
     },
     {
       id: 'actions',
       header: 'Aksi',
       cell: ({ row }) => (
         <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDownload(row.original)}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -223,33 +196,171 @@ export default function Project() {
     },
   ];
 
-  const filteredData = useMemo(() => {
-    let data = mockProjects;
-    if (search) {
-      data = data.filter(item =>
-        item.name.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-    if (semester) {
-      data = data.filter(item =>
-        item.semester === semester
-      );
-    }
-    if (category) {
-      data = data.filter(item =>
-        item.category === category
-      );
-    }
-    return data;
-  }, [search, semester, category]);
-
   const table = useReactTable({
-    data: filteredData,
+    data: projects,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: pagination.total_pages,
   });
+
+  const fetchProjects = async (pageIndex = 0, pageSize = 10) => {
+    try {
+      const params: {
+        search?: string;
+        filter_semester?: number;
+        filter_kategori?: string;
+        page?: number;
+        limit?: number;
+      } = {
+        page: pageIndex + 1,
+        limit: pageSize,
+      };
+
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (semester && semester !== '') params.filter_semester = parseInt(semester);
+      if (category) params.filter_kategori = category;
+
+      const response = await projectAPI.getProjects(params);
+      setProjects(response.data.items || []);
+      setPagination(response.data.pagination);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      toast.error(err.message || 'Gagal memuat data project');
+    }
+  };
+
+  const handleApplyFilter = () => {
+    filterForm.setValue('semester', pendingSemester);
+    filterForm.setValue('category', pendingCategory);
+    setFilterOpen(false);
+  };
+
+  const handleResetFilter = () => {
+    setPendingSemester('');
+    setPendingCategory('');
+    filterForm.setValue('semester', '');
+    filterForm.setValue('category', '');
+  };
+
+  const handleCreate = createForm.handleSubmit(async (data) => {
+    try {
+      setIsCreateLoading(true);
+      const files = data.files.filter(f => f.file && f.name && f.semester);
+      if (files.length === 0) {
+        toast.error('Harap lengkapi semua field untuk setiap file');
+        return;
+      }
+
+      await projectAPI.createProjects({
+        files: files.map(f => f.file),
+        nama_project: files.map(f => f.name),
+        semester: files.map(f => f.semester!),
+      });
+
+      setIsCreateOpen(false);
+      createForm.reset();
+      toast.success('Project berhasil ditambahkan');
+      fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      if ('errors' in err && err.errors) {
+        (err.errors as import('@/types').ValidationError[]).forEach((e) => toast.error(e.message));
+      } else {
+        toast.error(err.message || 'Gagal menambahkan project');
+      }
+    } finally {
+      setIsCreateLoading(false);
+    }
+  });
+
+  const handleEdit = editForm.handleSubmit(async (data) => {
+    if (!editingItem) return;
+
+    try {
+      setIsEditLoading(true);
+      const fileData = data.files[0];
+      if (!fileData || !fileData.name || !fileData.semester) {
+        toast.error('Harap lengkapi semua field');
+        return;
+      }
+
+      await projectAPI.updateProject(editingItem.id, {
+        nama_project: fileData.name,
+        semester: fileData.semester,
+        file: fileData.file.size > 0 ? fileData.file : undefined,
+      });
+
+      setIsEditOpen(false);
+      setEditingItem(null);
+      editForm.reset();
+      toast.success('Project berhasil diperbarui');
+      fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      if ('errors' in err && err.errors) {
+        (err.errors as import('@/types').ValidationError[]).forEach((e) => toast.error(e.message));
+      } else {
+        toast.error(err.message || 'Gagal memperbarui project');
+      }
+    } finally {
+      setIsEditLoading(false);
+    }
+  });
+
+  const handleDelete = async () => {
+    if (!deletingItem) return;
+
+    try {
+      setIsDeleteLoading(true);
+      await projectAPI.deleteProject(deletingItem.id);
+      setIsDeleteOpen(false);
+      setDeletingItem(null);
+      toast.success('Project berhasil dihapus');
+      fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      toast.error(err.message || 'Gagal menghapus project');
+    } finally {
+      setIsDeleteLoading(false);
+    }
+  };
+
+  const handleDownload = async (item: ProjectListItem) => {
+    try {
+      const blob = await projectAPI.downloadProjects([item.id]);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${item.nama_project}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Project berhasil didownload');
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      toast.error(err.message || 'Gagal mendownload project');
+    }
+  };
+
+  const openEditDialog = (item: ProjectListItem) => {
+    setEditingItem(item);
+    editForm.setValue('files', [{ file: new File([], item.nama_project), name: item.nama_project, category: item.kategori, semester: item.semester, existingFileSize: item.ukuran }]);
+    setIsEditOpen(true);
+  };
+
+  const openDeleteDialog = (item: ProjectListItem) => {
+    setDeletingItem(item);
+    setIsDeleteOpen(true);
+  };
+
+
+  useEffect(() => {
+    fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+  }, [debouncedSearch, semester, category]);
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -444,6 +555,9 @@ export default function Project() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Upload Project</DialogTitle>
+            <DialogDescription>
+              Upload project files dengan mengisi informasi yang diperlukan.
+            </DialogDescription>
           </DialogHeader>
           <Form {...createForm}>
             <form onSubmit={handleCreate} className="space-y-4">
@@ -458,7 +572,7 @@ export default function Project() {
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
                         categoryOptions={categoryOptions}
-                        editableName={false}
+                        editableName={true}
                       />
                     </FormControl>
                   </FormItem>
@@ -468,7 +582,10 @@ export default function Project() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit">Upload</Button>
+                <Button type="submit" disabled={isCreateLoading}>
+                  {isCreateLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Upload
+                </Button>
               </div>
             </form>
           </Form>
@@ -479,6 +596,9 @@ export default function Project() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>
+              Edit informasi project yang dipilih.
+            </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={handleEdit} className="space-y-4">
@@ -493,7 +613,7 @@ export default function Project() {
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
                         categoryOptions={categoryOptions}
-                        editableName={false}
+                        editableName={true}
                       />
                     </FormControl>
                   </FormItem>
@@ -503,7 +623,10 @@ export default function Project() {
                 <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit">Simpan</Button>
+                <Button type="submit" disabled={isEditLoading}>
+                  {isEditLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Simpan
+                </Button>
               </div>
             </form>
           </Form>
@@ -514,7 +637,8 @@ export default function Project() {
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         onConfirm={handleDelete}
-        itemName={deletingItem?.name}
+        itemName={deletingItem?.nama_project}
+        loading={isDeleteLoading}
       />
     </div>
   );
