@@ -255,3 +255,49 @@ export interface ProjectUpdateRequest {
   semester?: number;
   file?: File;
 }
+
+export interface Modul {
+  id: number;
+  nama_file: string;
+  tipe: string;
+  ukuran: string;
+  path_file: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModulListItem {
+  id: number;
+  nama_file: string;
+  tipe: string;
+  ukuran: string;
+  path_file: string;
+  terakhir_diperbarui: string;
+}
+
+export interface ModulListResponse extends BaseResponse {
+  data: {
+    items: ModulListItem[];
+    pagination: Pagination;
+  };
+}
+
+export interface ModulCreateResponse extends BaseResponse {
+  data: {
+    items: Modul[];
+  };
+}
+
+export interface ModulUpdateResponse extends BaseResponse {
+  data: Modul;
+}
+
+export interface ModulCreateRequest {
+  files: File[];
+  nama_file: string[];
+}
+
+export interface ModulUpdateRequest {
+  nama_file?: string;
+  file?: File;
+}

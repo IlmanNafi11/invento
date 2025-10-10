@@ -573,6 +573,7 @@ export default function Project() {
                         value={field.value}
                         categoryOptions={categoryOptions}
                         editableName={true}
+                        namePlaceholder="Nama project"
                       />
                     </FormControl>
                   </FormItem>
@@ -614,6 +615,7 @@ export default function Project() {
                         value={field.value}
                         categoryOptions={categoryOptions}
                         editableName={true}
+                        namePlaceholder="Nama project"
                       />
                     </FormControl>
                   </FormItem>

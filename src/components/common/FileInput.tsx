@@ -20,10 +20,13 @@ interface FileInputProps {
   value?: { file: File; name: string; category?: string; semester?: number; existingFileSize?: string }[];
   categoryOptions?: { value: string; label: string }[];
   editableName?: boolean;
+  showCategory?: boolean;
+  showSemester?: boolean;
+  namePlaceholder?: string;
 }
 
 const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
-  ({ id, label = 'Pilih file', accept, onChange, value = [], categoryOptions, editableName = true }, ref) => {
+  ({ id, label = 'Pilih file', accept, onChange, value = [], categoryOptions, editableName = true, showCategory = true, showSemester = true, namePlaceholder = 'Nama file' }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
@@ -98,12 +101,12 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                         value={item.name}
                         onChange={(e) => updateFileName(index, e.target.value)}
                         className="text-sm h-8"
-                        placeholder="Nama project"
+                        placeholder={namePlaceholder}
                       />
                     ) : (
                       <p className="text-sm font-medium truncate">{item.name}</p>
                     )}
-                    {categoryOptions && (
+                    {showCategory && categoryOptions && (
                       <Select
                         value={item.category || ''}
                         onValueChange={(value) => updateFileCategory(index, value)}
@@ -120,21 +123,23 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                         </SelectContent>
                       </Select>
                     )}
-                    <Select
-                      value={item.semester ? item.semester.toString() : undefined}
-                      onValueChange={(value) => updateFileSemester(index, parseInt(value))}
-                    >
-                      <SelectTrigger className="w-full h-8">
-                        <SelectValue placeholder="Pilih semester" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 8 }, (_, i) => i + 1).map((semester) => (
-                          <SelectItem key={semester} value={semester.toString()}>
-                            Semester {semester}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {showSemester && (
+                      <Select
+                        value={item.semester ? item.semester.toString() : undefined}
+                        onValueChange={(value) => updateFileSemester(index, parseInt(value))}
+                      >
+                        <SelectTrigger className="w-full h-8">
+                          <SelectValue placeholder="Pilih semester" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 8 }, (_, i) => i + 1).map((semester) => (
+                            <SelectItem key={semester} value={semester.toString()}>
+                              Semester {semester}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {item.existingFileSize || `${(item.file.size / 1024 / 1024).toFixed(2)} MB`}
                     </p>

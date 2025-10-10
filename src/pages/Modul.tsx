@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Upload, Search, Filter, Edit, Trash2 } from 'lucide-react';
+import { Upload, Search, Filter, Edit, Trash2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useReactTable,
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,33 +59,46 @@ import {
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
-const mockFiles: FileItem[] = [];
-import { formatFileSize, formatDate } from '@/utils/format';
-import type { FileItem, FileType } from '@/types';
+import { formatDate } from '@/utils/format';
+import { useDebounce } from '@/hooks/useDebounce';
+import { modulAPI } from '@/lib/modulAPI';
+import type { ModulListItem, ErrorResponse, ValidationErrorResponse } from '@/types';
 
-const fileTypeOptions: { value: FileType; label: string }[] = [
+const fileTypeOptions: { value: string; label: string }[] = [
+  { value: '', label: 'Semua' },
   { value: 'pdf', label: 'PDF' },
   { value: 'docx', label: 'DOCX' },
-  { value: 'ppt', label: 'PPT' },
+  { value: 'xlsx', label: 'XLSX' },
+  { value: 'pptx', label: 'PPTX' },
+  { value: 'jpg', label: 'JPG' },
+  { value: 'png', label: 'PNG' },
+  { value: 'jpeg', label: 'JPEG' },
+  { value: 'gif', label: 'GIF' },
 ];
 
 interface FilterForm {
-  fileType: FileType | '';
+  fileType: string;
 }
 
-interface FileForm {
-  files: { file: File; name: string }[];
+interface ModulForm {
+  files: { file: File; name: string; existingFileSize?: string }[];
 }
 
 export default function Modul() {
   const [search, setSearch] = useState('');
+  const [moduls, setModuls] = useState<ModulListItem[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total_items: 0, total_pages: 0 });
   const [filterOpen, setFilterOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [deletingItem, setDeletingItem] = useState<FileItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<ModulListItem | null>(null);
+  const [isCreateLoading, setIsCreateLoading] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [editingItem, setEditingItem] = useState<ModulListItem | null>(null);
 
-  const [pendingFileType, setPendingFileType] = useState<FileType | ''>('');
+  const [pendingFileType, setPendingFileType] = useState<string>('');
 
   const filterForm = useForm<FilterForm>({
     defaultValues: {
@@ -92,13 +106,13 @@ export default function Modul() {
     },
   });
 
-  const createForm = useForm<FileForm>({
+  const createForm = useForm<ModulForm>({
     defaultValues: {
       files: [],
     },
   });
 
-  const editForm = useForm<FileForm>({
+  const editForm = useForm<ModulForm>({
     defaultValues: {
       files: [],
     },
@@ -109,70 +123,42 @@ export default function Modul() {
     name: 'fileType',
   });
 
-  const handleApplyFilter = () => {
-    filterForm.setValue('fileType', pendingFileType);
-    setFilterOpen(false);
-  };
+  const debouncedSearch = useDebounce(search, 500);
 
-  const handleResetFilter = () => {
-    setPendingFileType('');
-    filterForm.setValue('fileType', '');
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleCreate = createForm.handleSubmit((_data) => {
-    setIsCreateOpen(false);
-    createForm.reset();
-    toast.success('File berhasil ditambahkan');
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleEdit = editForm.handleSubmit((_data) => {
-    setIsEditOpen(false);
-    editForm.reset();
-    toast.success('File berhasil diperbarui');
-  });
-
-  const handleDelete = () => {
-    setIsDeleteOpen(false);
-    setDeletingItem(null);
-    toast.success('File berhasil dihapus');
-  };
-
-  const openEditDialog = (item: FileItem) => {
-    editForm.setValue('files', [{ file: new File([], item.name), name: item.name }]);
-    setIsEditOpen(true);
-  };
-
-  const openDeleteDialog = (item: FileItem) => {
-    setDeletingItem(item);
-    setIsDeleteOpen(true);
-  };
-
-  const columns: ColumnDef<FileItem>[] = [
+  const columns: ColumnDef<ModulListItem>[] = [
     {
-      accessorKey: 'name',
+      accessorKey: 'nama_file',
       header: 'Nama File',
     },
     {
-      accessorKey: 'category',
-      header: 'Kategori',
+      accessorKey: 'tipe',
+      header: 'Tipe',
+      cell: ({ getValue }) => {
+        const tipe = getValue<string>();
+        return fileTypeOptions.find(option => option.value === tipe)?.label || tipe.toUpperCase();
+      },
     },
     {
-      accessorKey: 'size',
+      accessorKey: 'ukuran',
       header: 'Ukuran',
-      cell: ({ getValue }) => formatFileSize(getValue<number>()),
     },
     {
-      accessorKey: 'lastUpdated',
+      accessorKey: 'terakhir_diperbarui',
       header: 'Terakhir Diperbarui',
-      cell: ({ getValue }) => formatDate(getValue<Date>()),
+      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
     },
     {
       id: 'actions',
       header: 'Aksi',
       cell: ({ row }) => (
         <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDownload(row.original)}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -192,28 +178,163 @@ export default function Modul() {
     },
   ];
 
-  const filteredData = useMemo(() => {
-    let data = mockFiles;
-    if (search) {
-      data = data.filter(item =>
-        item.name.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-    if (fileType) {
-      data = data.filter(item =>
-        item.category.toLowerCase() === fileType.toLowerCase()
-      );
-    }
-    return data;
-  }, [search, fileType]);
-
   const table = useReactTable({
-    data: filteredData,
+    data: moduls,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: pagination.total_pages,
   });
+
+  const fetchModuls = async (pageIndex = 0, pageSize = 10) => {
+    try {
+      const params: {
+        search?: string;
+        filter_type?: string;
+        page?: number;
+        limit?: number;
+      } = {
+        page: pageIndex + 1,
+        limit: pageSize,
+      };
+
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (fileType) params.filter_type = fileType;
+
+      const response = await modulAPI.getModuls(params);
+      setModuls(response.data.items || []);
+      setPagination(response.data.pagination);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      toast.error(err.message || 'Gagal memuat data modul');
+    }
+  };
+
+  const handleApplyFilter = () => {
+    filterForm.setValue('fileType', pendingFileType);
+    setFilterOpen(false);
+  };
+
+  const handleResetFilter = () => {
+    setPendingFileType('');
+    filterForm.setValue('fileType', '');
+  };
+
+  const handleCreate = createForm.handleSubmit(async (data) => {
+    try {
+      setIsCreateLoading(true);
+      const files = data.files.filter(f => f.file && f.name);
+      if (files.length === 0) {
+        toast.error('Harap lengkapi nama file untuk setiap file yang diupload');
+        return;
+      }
+
+      await modulAPI.createModuls({
+        files: files.map(f => f.file),
+        nama_file: files.map(f => f.name),
+      });
+
+      setIsCreateOpen(false);
+      createForm.reset();
+      toast.success('Modul berhasil ditambahkan');
+      fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      if ('errors' in err && err.errors) {
+        (err.errors as import('@/types').ValidationError[]).forEach((e) => toast.error(e.message));
+      } else {
+        toast.error(err.message || 'Gagal menambahkan modul');
+      }
+    } finally {
+      setIsCreateLoading(false);
+    }
+  });
+
+  const handleEdit = editForm.handleSubmit(async (data) => {
+    if (!editingItem) return;
+
+    try {
+      setIsEditLoading(true);
+      const fileData = data.files[0];
+      if (!fileData || !fileData.name) {
+        toast.error('Harap lengkapi nama file');
+        return;
+      }
+
+      await modulAPI.updateModul(editingItem.id, {
+        nama_file: fileData.name,
+        file: fileData.file.size > 0 ? fileData.file : undefined,
+      });
+
+      setIsEditOpen(false);
+      setEditingItem(null);
+      editForm.reset();
+      toast.success('Modul berhasil diperbarui');
+      fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      if ('errors' in err && err.errors) {
+        (err.errors as import('@/types').ValidationError[]).forEach((e) => toast.error(e.message));
+      } else {
+        toast.error(err.message || 'Gagal memperbarui modul');
+      }
+    } finally {
+      setIsEditLoading(false);
+    }
+  });
+
+  const handleDelete = async () => {
+    if (!deletingItem) return;
+
+    try {
+      setIsDeleteLoading(true);
+      await modulAPI.deleteModul(deletingItem.id);
+      setIsDeleteOpen(false);
+      setDeletingItem(null);
+      toast.success('Modul berhasil dihapus');
+      fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      toast.error(err.message || 'Gagal menghapus modul');
+    } finally {
+      setIsDeleteLoading(false);
+    }
+  };
+
+  const handleDownload = async (item: ModulListItem) => {
+    try {
+      const blob = await modulAPI.downloadModuls([item.id]);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = item.nama_file;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Modul berhasil didownload');
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      toast.error(err.message || 'Gagal mendownload modul');
+    }
+  };
+
+  const openEditDialog = (item: ModulListItem) => {
+    setEditingItem(item);
+    editForm.setValue('files', [{ file: new File([], item.nama_file), name: item.nama_file, existingFileSize: item.ukuran }]);
+    setIsEditOpen(true);
+  };
+
+  const openDeleteDialog = (item: ModulListItem) => {
+    setDeletingItem(item);
+    setIsDeleteOpen(true);
+  };
+
+  useEffect(() => {
+    fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+  }, [debouncedSearch, fileType]);
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -223,7 +344,7 @@ export default function Modul() {
           <div className="relative min-w-0 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Cari file..."
+              placeholder="Cari modul..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -231,9 +352,14 @@ export default function Modul() {
           </div>
           <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="relative">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
+                {fileType && (
+                  <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    1
+                  </Badge>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-80">
@@ -365,7 +491,7 @@ export default function Modul() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Upload</DialogTitle>
+            <DialogTitle>Upload Modul</DialogTitle>
           </DialogHeader>
           <Form {...createForm}>
             <form onSubmit={handleCreate} className="space-y-4">
@@ -376,9 +502,12 @@ export default function Modul() {
                   <FormItem>
                     <FormControl>
                       <FileInput
-                        label="Upload File"
+                        label="Upload Modul"
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
+                        showCategory={false}
+                        showSemester={false}
+                        namePlaceholder="Nama modul"
                       />
                     </FormControl>
                   </FormItem>
@@ -388,7 +517,10 @@ export default function Modul() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit">Upload</Button>
+                <Button type="submit" disabled={isCreateLoading}>
+                  {isCreateLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Upload
+                </Button>
               </div>
             </form>
           </Form>
@@ -398,7 +530,7 @@ export default function Modul() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit File</DialogTitle>
+            <DialogTitle>Edit Modul</DialogTitle>
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={handleEdit} className="space-y-4">
@@ -409,9 +541,12 @@ export default function Modul() {
                   <FormItem>
                     <FormControl>
                       <FileInput
-                        label="Upload File Baru"
+                        label="Upload Modul Baru"
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
+                        showCategory={false}
+                        showSemester={false}
+                        namePlaceholder="Nama modul"
                       />
                     </FormControl>
                   </FormItem>
@@ -421,7 +556,10 @@ export default function Modul() {
                 <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit">Simpan</Button>
+                <Button type="submit" disabled={isEditLoading}>
+                  {isEditLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Simpan
+                </Button>
               </div>
             </form>
           </Form>
@@ -432,7 +570,8 @@ export default function Modul() {
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         onConfirm={handleDelete}
-        itemName={deletingItem?.name}
+        itemName={deletingItem?.nama_file}
+        loading={isDeleteLoading}
       />
     </div>
   );
