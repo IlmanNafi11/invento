@@ -305,3 +305,24 @@ export interface ModulUpdateRequest {
   nama_file?: string;
   file?: File;
 }
+
+export interface Profile {
+  name: string;
+  email: string;
+  jenis_kelamin?: string | null;
+  foto_profil?: string | null;
+  role: string;
+  created_at: string;
+  jumlah_project: number;
+  jumlah_modul: number;
+}
+
+export interface ProfileResponse extends BaseResponse {
+  data: Profile;
+}
+
+export interface UpdateProfileRequest {
+  name: string;
+  jenis_kelamin?: string;
+  foto_profil?: File;
+}

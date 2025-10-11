@@ -3,6 +3,7 @@ import sidebarReducer from './sidebarSlice'
 import roleReducer from './roleSlice'
 import userReducer from './userSlice'
 import authReducer from './authSlice'
+import profileReducer from './profileSlice'
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     role: roleReducer,
     user: userReducer,
     auth: authReducer,
+    profile: profileReducer,
   },
 })
 

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { authAPI } from './auth';
+import { clearProfile, fetchProfile } from './profileSlice';
 import type { User, AuthRequest, RegisterRequest, AuthSuccessResponse } from '@/types';
 
 interface AuthState {
@@ -16,7 +17,6 @@ const initialState: AuthState = {
   error: null,
 };
 
-// Load initial state from localStorage
 const loadAuthState = (): AuthState => {
   try {
     const token = localStorage.getItem('access_token');
@@ -39,9 +39,16 @@ export const login = createAsyncThunk<
   AuthSuccessResponse,
   AuthRequest,
   { rejectValue: string }
->('auth/login', async (credentials, { rejectWithValue }) => {
+>('auth/login', async (credentials, { rejectWithValue, dispatch }) => {
   try {
     const response = await authAPI.login(credentials);
+
+    localStorage.setItem('access_token', response.data.access_token);
+    localStorage.setItem('refresh_token', response.data.refresh_token);
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+
+    dispatch(fetchProfile());
+
     return response;
   } catch (error: unknown) {
     const err = error as { code?: number; message?: string; errors?: { message: string }[] };
@@ -60,9 +67,17 @@ export const register = createAsyncThunk<
   AuthSuccessResponse,
   RegisterRequest,
   { rejectValue: string }
->('auth/register', async (userData, { rejectWithValue }) => {
+>('auth/register', async (userData, { rejectWithValue, dispatch }) => {
   try {
     const response = await authAPI.register(userData);
+
+    // Store tokens immediately so fetchProfile can use them
+    localStorage.setItem('access_token', response.data.access_token);
+    localStorage.setItem('refresh_token', response.data.refresh_token);
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+
+    dispatch(fetchProfile());
+
     return response;
   } catch (error: unknown) {
     const err = error as { code?: number; message?: string; errors?: { message: string }[] };
@@ -81,7 +96,7 @@ const authSlice = createSlice({
   name: 'auth',
   initialState: loadAuthState(),
   reducers: {
-    logout: (state) => {
+    clearAuthState: (state) => {
       state.user = null;
       state.isAuthenticated = false;
       state.error = null;
@@ -105,10 +120,6 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.error = null;
 
-        // Store tokens and user in localStorage
-        localStorage.setItem('access_token', action.payload.data.access_token);
-        localStorage.setItem('refresh_token', action.payload.data.refresh_token);
-        localStorage.setItem('user', JSON.stringify(action.payload.data.user));
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -124,17 +135,26 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.error = null;
 
-        // Store tokens and user in localStorage
-        localStorage.setItem('access_token', action.payload.data.access_token);
-        localStorage.setItem('refresh_token', action.payload.data.refresh_token);
-        localStorage.setItem('user', JSON.stringify(action.payload.data.user));
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Registrasi gagal';
+      })
+      .addCase(logoutThunk.fulfilled, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
+        state.error = null;
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const logoutThunk = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
+  dispatch(clearProfile());
+});
+
+export const { clearAuthState, clearError } = authSlice.actions;
+export const logout = logoutThunk;
 export default authSlice.reducer;

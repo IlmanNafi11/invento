@@ -6,6 +6,8 @@ import type {
   ErrorResponse,
   ValidationErrorResponse,
   UserPermissionsResponse,
+  ProfileResponse,
+  Profile,
 } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
@@ -93,9 +95,30 @@ class UserAPI {
     return this.request<UserPermissionsResponse>('/user/permissions');
   }
 
-  async getProfile(): Promise<{ email: string; role: string }> {
-    const response = await this.request<{ data: { email: string; role: string } }>('/profile');
+  async getProfile(): Promise<Profile> {
+    const response = await this.request<ProfileResponse>('/profile');
     return response.data;
+  }
+
+  async updateProfile(formData: FormData): Promise<Profile> {
+    const url = `${API_BASE_URL}/profile`;
+
+    const token = localStorage.getItem('access_token');
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw data as ErrorResponse | ValidationErrorResponse;
+    }
+
+    return data.data as Profile;
   }
 }
 
