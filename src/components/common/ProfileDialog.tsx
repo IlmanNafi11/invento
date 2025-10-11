@@ -9,16 +9,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import type { UserItem } from "@/types";
-
 interface ProfileDialogProps {
-  user: UserItem | null;
+  user: { email: string; role: string } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function ProfileDialog({ user, open, onOpenChange }: ProfileDialogProps) {
-  if (!user) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -33,7 +30,7 @@ export function ProfileDialog({ user, open, onOpenChange }: ProfileDialogProps) 
             </Label>
             <Input
               id="email"
-              value={user.email}
+              value={user?.email || 'admin@invento.com'}
               disabled
             />
           </div>
@@ -43,7 +40,7 @@ export function ProfileDialog({ user, open, onOpenChange }: ProfileDialogProps) 
             </Label>
             <Input
               id="role"
-              value={user.role.name}
+              value={user?.role || 'Admin'}
               disabled
             />
           </div>

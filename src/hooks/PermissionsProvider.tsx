@@ -6,7 +6,7 @@ import { PermissionsContext } from './PermissionsContext';
 
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<ApiPermission[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
 
@@ -21,6 +21,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
+
+    setLoading(true);
 
     try {
       setLoading(true);
@@ -67,9 +69,13 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (isAuthenticated && permissions.length === 0) {
-      fetchPermissions();
-    } else if (!isAuthenticated) {
+    if (isAuthenticated) {
+      if (permissions.length === 0) {
+        fetchPermissions();
+      } else {
+        setLoading(false);
+      }
+    } else {
       clearPermissions();
     }
   }, [isAuthenticated, permissions.length, fetchPermissions, clearPermissions]);

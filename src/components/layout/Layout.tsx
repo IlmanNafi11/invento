@@ -11,6 +11,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -37,15 +38,17 @@ import { logout } from "@/lib/authSlice";
 import { ProfileDialog } from "@/components/common/ProfileDialog";
 import { getInitials } from "@/utils/format";
 import { authAPI } from "@/lib/auth";
+import { userAPI } from "@/lib/userAPI";
 
 export default function Layout() {
   const isOpen = useAppSelector((state) => state.sidebar.open);
-  const currentUser = useAppSelector((state) => state.user.currentUser);
+  const currentUser = useAppSelector((state) => state.auth.user);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
   const [profileOpen, setProfileOpen] = useState(false);
   const [shouldNavigateToLogin, setShouldNavigateToLogin] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ email: string; role: string } | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -66,6 +69,21 @@ export default function Layout() {
       setShouldNavigateToLogin(false);
     }
   }, [shouldNavigateToLogin, navigate]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const profile = await userAPI.getProfile();
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      }
+    };
+
+    if (currentUser) {
+      fetchProfile();
+    }
+  }, [currentUser]);
 
   const hasModulRead = hasPermission('modul', 'read');
   const hasProjectRead = hasPermission('Project', 'read');
@@ -169,25 +187,30 @@ export default function Layout() {
         )}
       </SidebarContent>
       <SidebarFooter>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent cursor-pointer">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="" alt="User" />
-                <AvatarFallback>{currentUser ? getInitials(currentUser.email) : 'U'}</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                <span className="text-sm font-medium">{currentUser?.email || 'admin@invento.com'}</span>
-                <span className="text-xs text-muted-foreground">{currentUser?.role.name || 'Admin'}</span>
-              </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div className="flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent cursor-pointer">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src="" alt="User" />
+              <AvatarFallback>{currentUser ? getInitials(currentUser.email) : 'U'}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+              <span className="text-sm font-medium">{userProfile?.email || currentUser?.email || 'admin@invento.com'}</span>
+              <span className="text-xs text-muted-foreground">{userProfile?.role || 'Admin'}</span>
             </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setProfileOpen(true)}>Profil</DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarFooter>
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <div className="px-2 py-1.5 text-sm">
+            <div className="font-medium">{userProfile?.email || currentUser?.email || 'admin@invento.com'}</div>
+            <div className="text-muted-foreground">{userProfile?.role || 'Admin'}</div>
+          </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setProfileOpen(true)}>Profil</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarFooter>
     </Sidebar>
   );
 
@@ -202,6 +225,11 @@ export default function Layout() {
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <div className="px-2 py-1.5 text-sm">
+              <div className="font-medium">{userProfile?.email || currentUser?.email || 'admin@invento.com'}</div>
+              <div className="text-muted-foreground">{userProfile?.role || 'Admin'}</div>
+            </div>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setProfileOpen(true)}>Profil</DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
@@ -212,19 +240,21 @@ export default function Layout() {
   );
 
   return (
-    <SidebarProvider open={isOpen} onOpenChange={(open) => dispatch(setSidebarOpen(open))}>
-      {sidebarContent}
-      <main className="flex flex-1 flex-col">
-        {headerContent}
-        <div className="flex-1 p-6">
-          <Outlet />
-        </div>
-      </main>
+    <>
+      <SidebarProvider open={isOpen} onOpenChange={(open) => dispatch(setSidebarOpen(open))}>
+        {sidebarContent}
+        <main className="flex flex-1 flex-col">
+          {headerContent}
+          <div className="flex-1 p-6">
+            <Outlet />
+          </div>
+        </main>
+      </SidebarProvider>
       <ProfileDialog
-        user={currentUser}
+        user={userProfile}
         open={profileOpen}
         onOpenChange={setProfileOpen}
       />
-    </SidebarProvider>
+    </>
   );
 }

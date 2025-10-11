@@ -92,6 +92,11 @@ class UserAPI {
   async getUserPermissions(): Promise<UserPermissionsResponse> {
     return this.request<UserPermissionsResponse>('/user/permissions');
   }
+
+  async getProfile(): Promise<{ email: string; role: string }> {
+    const response = await this.request<{ data: { email: string; role: string } }>('/profile');
+    return response.data;
+  }
 }
 
 export const userAPI = new UserAPI();
