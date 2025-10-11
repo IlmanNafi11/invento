@@ -32,7 +32,7 @@ import {
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setSidebarOpen } from "@/lib/sidebarSlice";
-import { clearUser } from "@/lib/userSlice";
+import { logout } from "@/lib/authSlice";
 import { ProfileDialog } from "@/components/common/ProfileDialog";
 import { getInitials } from "@/utils/format";
 import { authAPI } from "@/lib/auth";
@@ -52,9 +52,7 @@ export default function Layout() {
       console.error('Logout API failed:', error);
     }
 
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    dispatch(clearUser());
+    dispatch(logout());
     toast.success('Berhasil logout');
 
     setShouldNavigateToLogin(true);

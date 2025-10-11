@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Upload, Search, Filter, Edit, Trash2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -188,7 +188,7 @@ export default function Modul() {
     pageCount: pagination.total_pages,
   });
 
-  const fetchModuls = async (pageIndex = 0, pageSize = 10) => {
+  const fetchModuls = useCallback(async (pageIndex = 0, pageSize = 10) => {
     try {
       const params: {
         search?: string;
@@ -210,7 +210,7 @@ export default function Modul() {
       const err = error as ErrorResponse | ValidationErrorResponse;
       toast.error(err.message || 'Gagal memuat data modul');
     }
-  };
+  }, [debouncedSearch, fileType]);
 
   const handleApplyFilter = () => {
     filterForm.setValue('fileType', pendingFileType);
@@ -334,7 +334,7 @@ export default function Modul() {
 
   useEffect(() => {
     fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
-  }, [debouncedSearch, fileType]);
+  }, [fetchModuls, table]);
 
   return (
     <div className="flex flex-1 flex-col gap-4">

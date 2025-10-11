@@ -1,4 +1,4 @@
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,6 +20,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
   const { loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
 
@@ -31,19 +32,16 @@ export default function Login() {
     resolver: zodResolver(loginSchema),
   });
 
-  // Redirect if already authenticated
+  const from = location.state?.from?.pathname || "/dashboard";
+
   if (isAuthenticated) {
-    navigate("/dashboard");
+    navigate(from, { replace: true });
     return null;
   }
 
   const onSubmit = async (data: LoginForm) => {
-    try {
-      await dispatch(login(data)).unwrap();
-      navigate("/dashboard");
-    } catch {
-      // Error is handled by the slice
-    }
+    await dispatch(login(data)).unwrap();
+    navigate(from, { replace: true });
   };
 
   const handleInputChange = () => {

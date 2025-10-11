@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Upload, Search, Filter, Edit, Trash2, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
@@ -206,7 +206,7 @@ export default function Project() {
     pageCount: pagination.total_pages,
   });
 
-  const fetchProjects = async (pageIndex = 0, pageSize = 10) => {
+  const fetchProjects = useCallback(async (pageIndex = 0, pageSize = 10) => {
     try {
       const params: {
         search?: string;
@@ -230,7 +230,7 @@ export default function Project() {
       const err = error as ErrorResponse | ValidationErrorResponse;
       toast.error(err.message || 'Gagal memuat data project');
     }
-  };
+  }, [debouncedSearch, semester, category]);
 
   const handleApplyFilter = () => {
     filterForm.setValue('semester', pendingSemester);
@@ -360,7 +360,7 @@ export default function Project() {
 
   useEffect(() => {
     fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
-  }, [debouncedSearch, semester, category]);
+  }, [fetchProjects, table]);
 
   return (
     <div className="flex flex-1 flex-col gap-4">
