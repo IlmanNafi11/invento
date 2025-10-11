@@ -35,6 +35,8 @@
     "@reduxjs/toolkit": "^2.9.0",
     "@tailwindcss/vite": "^4.1.13",
     "@tanstack/react-table": "^8.21.3",
+    "casbin": "^5.39.0",
+    "casbin.js": "^0.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

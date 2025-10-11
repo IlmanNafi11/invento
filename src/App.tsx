@@ -11,6 +11,7 @@ const Modul = lazy(() => import('./pages/Modul'))
 const Project = lazy(() => import('./pages/Project'))
 const User = lazy(() => import('./pages/User'))
 const Role = lazy(() => import('./pages/Role'))
+const Forbidden = lazy(() => import('./pages/Forbidden'))
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forbidden" element={<Forbidden />} />
         <Route path="/" element={
           <ProtectedRoute>
             <Layout />
@@ -26,10 +28,29 @@ function App() {
         }>
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="modul" element={<Modul />} />
-          <Route path="project" element={<Project />} />
-          <Route path="user" element={<User />} />
-          <Route path="role" element={<Role />} />
+          <Route path="modul" element={
+            <ProtectedRoute requiredPermission={{ resource: 'modul', action: 'read' }}>
+              <Modul />
+            </ProtectedRoute>
+          } />
+          <Route path="project" element={
+            <ProtectedRoute requiredPermission={{ resource: 'Project', action: 'read' }}>
+              <Project />
+            </ProtectedRoute>
+          } />
+          <Route path="user" element={
+            <ProtectedRoute requiredPermission={{ resource: 'user', action: 'read' }}>
+              <User />
+            </ProtectedRoute>
+          } />
+          <Route path="role" element={
+            <ProtectedRoute requiredPermissions={[
+              { resource: 'Role', action: 'read' },
+              { resource: 'Permission', action: 'read' }
+            ]}>
+              <Role />
+            </ProtectedRoute>
+          } />
         </Route>
       </Routes>
     </Suspense>

@@ -161,6 +161,10 @@ export interface PermissionsResponse extends BaseResponse {
   };
 }
 
+export interface UserPermissionsResponse extends BaseResponse {
+  data: ApiPermission[];
+}
+
 export interface ResourcePermissions {
   name: string;
   permissions: PermissionItem[];

@@ -62,6 +62,7 @@ import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { formatDate } from '@/utils/format';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
+import { usePermissions } from '@/hooks/usePermissions';
 import { fetchUsers, updateUserRole, deleteUserAsync, fetchUserFiles, clearError } from '@/lib/userSlice';
 import { fetchRoles } from '@/lib/roleSlice';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -72,6 +73,7 @@ interface FilterForm {
 }
 
 export default function User() {
+  const { hasPermission } = usePermissions();
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<string>('');
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -232,20 +234,24 @@ export default function User() {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openEditDialog(row.original)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openDeleteDialog(row.original)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {hasPermission('user', 'update') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openEditDialog(row.original)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
+          {hasPermission('user', 'delete') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openDeleteDialog(row.original)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ),
     },

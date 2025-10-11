@@ -5,6 +5,7 @@ import type {
   SuccessResponse,
   ErrorResponse,
   ValidationErrorResponse,
+  UserPermissionsResponse,
 } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
@@ -86,6 +87,10 @@ class UserAPI {
     const endpoint = `/user/${id}/files${query ? `?${query}` : ''}`;
 
     return this.request<UserFilesResponse>(endpoint);
+  }
+
+  async getUserPermissions(): Promise<UserPermissionsResponse> {
+    return this.request<UserPermissionsResponse>('/user/permissions');
   }
 }
 

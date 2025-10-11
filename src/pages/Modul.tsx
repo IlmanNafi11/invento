@@ -61,6 +61,7 @@ import { FileInput } from '@/components/common/FileInput';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { formatDate } from '@/utils/format';
 import { useDebounce } from '@/hooks/useDebounce';
+import { usePermissions } from '@/hooks/usePermissions';
 import { modulAPI } from '@/lib/modulAPI';
 import type { ModulListItem, ErrorResponse, ValidationErrorResponse } from '@/types';
 
@@ -85,6 +86,7 @@ interface ModulForm {
 }
 
 export default function Modul() {
+  const { hasPermission } = usePermissions();
   const [search, setSearch] = useState('');
   const [moduls, setModuls] = useState<ModulListItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total_items: 0, total_pages: 0 });
@@ -159,20 +161,24 @@ export default function Modul() {
           >
             <Download className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openEditDialog(row.original)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openDeleteDialog(row.original)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {hasPermission('modul', 'update') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openEditDialog(row.original)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
+          {hasPermission('modul', 'delete') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openDeleteDialog(row.original)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -412,9 +418,11 @@ export default function Modul() {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={() => setIsCreateOpen(true)} size="icon">
-            <Upload className="h-4 w-4" />
-          </Button>
+          {hasPermission('modul', 'create') && (
+            <Button onClick={() => setIsCreateOpen(true)} size="icon">
+              <Upload className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
       <div className="rounded-md border">

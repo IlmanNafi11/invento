@@ -2,6 +2,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { login, clearError } from "@/lib/authSlice";
 import { useAppDispatch, useAppSelector } from "@/hooks/useAppDispatch";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const loginSchema = z.object({
   email: z.string().email("Format email tidak valid"),
@@ -23,6 +25,10 @@ export default function Login() {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { loading: permissionsLoading } = usePermissions();
+  const [loginSuccess, setLoginSuccess] = useState(false);
+
+  const isRedirecting = isAuthenticated && loginSuccess && permissionsLoading;
 
   const {
     register,
@@ -34,14 +40,15 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || "/dashboard";
 
-  if (isAuthenticated) {
-    navigate(from, { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated && loginSuccess && !permissionsLoading) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, loginSuccess, permissionsLoading, navigate, from]);
 
   const onSubmit = async (data: LoginForm) => {
     await dispatch(login(data)).unwrap();
-    navigate(from, { replace: true });
+    setLoginSuccess(true);
   };
 
   const handleInputChange = () => {
@@ -90,11 +97,11 @@ export default function Login() {
               />
               {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
+            <Button type="submit" className="w-full" disabled={loading || isRedirecting}>
+              {loading || isRedirecting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
+                  {isRedirecting ? "Loading permissions..." : "Loading..."}
                 </>
               ) : (
                 "Login"

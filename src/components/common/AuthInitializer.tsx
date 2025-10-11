@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '@/hooks/useAppDispatch';
 import { logout } from '@/lib/authSlice';
 
 export default function AuthInitializer() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
 
   useEffect(() => {
@@ -13,6 +15,7 @@ export default function AuthInitializer() {
       if (!token) {
         if (isAuthenticated) {
           dispatch(logout());
+          navigate('/login');
         }
         return;
       }
@@ -26,7 +29,7 @@ export default function AuthInitializer() {
     };
 
     checkTokenValidity();
-  }, [dispatch, isAuthenticated]);
+  }, [dispatch, isAuthenticated, navigate]);
 
   return null;
 }

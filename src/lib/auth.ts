@@ -49,10 +49,12 @@ class AuthAPI {
 
   async logout(): Promise<SuccessResponse> {
     const token = localStorage.getItem('access_token');
+    const refreshToken = localStorage.getItem('refresh_token');
     return this.request<SuccessResponse>('/auth/logout', {
       method: 'POST',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(refreshToken ? { 'X-Refresh-Token': refreshToken } : {}),
       },
     });
   }

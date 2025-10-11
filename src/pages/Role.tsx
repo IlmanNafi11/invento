@@ -44,6 +44,7 @@ import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { formatDate } from '@/utils/format';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   fetchRoles,
   fetchPermissions,
@@ -61,6 +62,7 @@ interface RoleForm {
 }
 
 export default function Role() {
+  const { hasPermission } = usePermissions();
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -177,22 +179,26 @@ export default function Role() {
       header: 'Aksi',
       cell: ({ row }) => (
         <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openEditDialog(row.original)}
-            disabled={loading}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openDeleteDialog(row.original)}
-            disabled={loading}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {hasPermission('Role', 'update') && hasPermission('Permission', 'update') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openEditDialog(row.original)}
+              disabled={loading}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
+          {hasPermission('Role', 'delete') && hasPermission('Permission', 'delete') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openDeleteDialog(row.original)}
+              disabled={loading}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -275,10 +281,12 @@ export default function Role() {
               className="pl-9"
             />
           </div>
-          <Button onClick={() => setIsCreateOpen(true)} className="shrink-0" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-            Tambah Role
-          </Button>
+          {hasPermission('Role', 'create') && hasPermission('Permission', 'create') && (
+            <Button onClick={() => setIsCreateOpen(true)} className="shrink-0" disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Tambah Role
+            </Button>
+          )}
         </div>
       </div>
 

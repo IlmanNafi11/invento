@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
+import { usePermissions } from "@/hooks/usePermissions";
 import { setSidebarOpen } from "@/lib/sidebarSlice";
 import { logout } from "@/lib/authSlice";
 import { ProfileDialog } from "@/components/common/ProfileDialog";
@@ -42,6 +43,7 @@ export default function Layout() {
   const currentUser = useAppSelector((state) => state.user.currentUser);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
   const [profileOpen, setProfileOpen] = useState(false);
   const [shouldNavigateToLogin, setShouldNavigateToLogin] = useState(false);
 
@@ -64,6 +66,25 @@ export default function Layout() {
       setShouldNavigateToLogin(false);
     }
   }, [shouldNavigateToLogin, navigate]);
+
+  const hasModulRead = hasPermission('modul', 'read');
+  const hasProjectRead = hasPermission('Project', 'read');
+  const hasUserRead = hasPermission('user', 'read');
+  const hasRoleRead = hasPermission('Role', 'read');
+  const hasPermissionRead = hasPermission('Permission', 'read');
+
+  const hasFileManagerAccess = hasModulRead || hasProjectRead;
+  const hasUserManagementAccess = hasUserRead || (hasRoleRead && hasPermissionRead);
+
+  console.log('[Layout] Permission checks:', {
+    hasModulRead,
+    hasProjectRead,
+    hasUserRead,
+    hasRoleRead,
+    hasPermissionRead,
+    hasFileManagerAccess,
+    hasUserManagementAccess,
+  });
 
   const sidebarContent = (
     <Sidebar collapsible="icon">
@@ -88,52 +109,64 @@ export default function Layout() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>File Manager</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/modul">
-                    <Code />
-                    Modul
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/project">
-                    <Briefcase />
-                    Project
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>User Management</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/user">
-                    <Users />
-                    User
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/role">
-                    <Shield />
-                    Role & Permission
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {hasFileManagerAccess && (
+          <SidebarGroup>
+            <SidebarGroupLabel>File Manager</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {hasModulRead && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/modul">
+                        <Code />
+                        Modul
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {hasProjectRead && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/project">
+                        <Briefcase />
+                        Project
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {hasUserManagementAccess && (
+          <SidebarGroup>
+            <SidebarGroupLabel>User Management</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {hasUserRead && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/user">
+                        <Users />
+                        User
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {hasRoleRead && hasPermissionRead && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/role">
+                        <Shield />
+                        Role & Permission
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <DropdownMenu>

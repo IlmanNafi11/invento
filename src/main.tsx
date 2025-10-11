@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from '@/components/ui/sonner'
+import { PermissionsProvider } from '@/hooks/PermissionsProvider'
 import { store } from '@/lib/store'
 import './index.css'
 import App from './App.tsx'
@@ -11,12 +12,14 @@ import App from './App.tsx'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Provider store={store}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <BrowserRouter>
-          <App />
-          <Toaster />
-        </BrowserRouter>
-      </ThemeProvider>
+      <PermissionsProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <BrowserRouter>
+            <App />
+            <Toaster />
+          </BrowserRouter>
+        </ThemeProvider>
+      </PermissionsProvider>
     </Provider>
   </StrictMode>,
 )
