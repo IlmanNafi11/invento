@@ -110,7 +110,7 @@ export default function Modul() {
 
   const createForm = useForm<ModulForm>({
     defaultValues: {
-      files: [],
+      files: [{ file: undefined, name: '' }],
     },
   });
 
@@ -516,6 +516,10 @@ export default function Modul() {
                         showCategory={false}
                         showSemester={false}
                         namePlaceholder="Nama modul"
+                        layout="grid"
+                        nameLabel="Nama Modul"
+                        addButtonLabel="Tambah Modul Lain"
+                        fileLabel="File Modul"
                       />
                     </FormControl>
                   </FormItem>
@@ -555,6 +559,10 @@ export default function Modul() {
                         showCategory={false}
                         showSemester={false}
                         namePlaceholder="Nama modul"
+                        multiple={false}
+                        layout="grid"
+                        nameLabel="Nama Modul"
+                        fileLabel="File Modul"
                       />
                     </FormControl>
                   </FormItem>

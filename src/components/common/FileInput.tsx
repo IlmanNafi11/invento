@@ -25,10 +25,13 @@ interface FileInputProps {
   showCategory?: boolean;
   showSemester?: boolean;
   namePlaceholder?: string;
+  nameLabel?: string;
+  addButtonLabel?: string;
+  fileLabel?: string;
 }
 
 const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
-  ({ id, label = 'Pilih file', accept, multiple = true, layout = 'card', onChange, value = [], categoryOptions, editableName = true, showCategory = true, showSemester = true, namePlaceholder = 'Nama file' }, ref) => {
+  ({ id, label = 'Pilih file', accept, multiple = true, layout = 'card', onChange, value = [], categoryOptions, editableName = true, showCategory = true, showSemester = true, namePlaceholder = 'Nama file', nameLabel = 'Nama Project', addButtonLabel = 'Tambah Project Lain', fileLabel = 'File Project' }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
@@ -169,7 +172,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                 )}
                 {editableName && (
                   <div className="space-y-1">
-                    <Label className="text-sm font-medium">Nama Project</Label>
+                    <Label className="text-sm font-medium">{nameLabel}</Label>
                     <Input
                       value={item.name}
                       onChange={(e) => multiple ? updateFileName(index, e.target.value) : updateName(e.target.value)}
@@ -221,7 +224,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                   )}
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-sm font-medium" htmlFor="">File Project</Label>
+                  <Label className="text-sm font-medium" htmlFor="">{fileLabel}</Label>
                   <Card
                     className={`border-2 border-dashed transition-colors cursor-pointer ${
                       isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
@@ -274,7 +277,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                 className="w-full"
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Tambah Project Lain
+                {addButtonLabel}
               </Button>
             )}
           </div>
@@ -289,7 +292,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                       <div className="flex-1 min-w-0 space-y-2">
                         {editableName && (
                           <div>
-                            <Label className="text-xs">Nama Project</Label>
+                            <Label className="text-xs">{nameLabel}</Label>
                             <Input
                               value={item.name}
                               onChange={(e) => updateFileName(index, e.target.value)}
