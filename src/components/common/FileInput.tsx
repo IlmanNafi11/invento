@@ -16,8 +16,10 @@ interface FileInputProps {
   id?: string;
   label?: string;
   accept?: string;
-  onChange?: (files: { file: File; name: string; category?: string; semester?: number; existingFileSize?: string }[]) => void;
-  value?: { file: File; name: string; category?: string; semester?: number; existingFileSize?: string }[];
+  multiple?: boolean;
+  layout?: 'card' | 'grid';
+  onChange?: (files: { file?: File; name: string; category?: string; semester?: number; existingFileSize?: string }[]) => void;
+  value?: { file?: File; name: string; category?: string; semester?: number; existingFileSize?: string }[];
   categoryOptions?: { value: string; label: string }[];
   editableName?: boolean;
   showCategory?: boolean;
@@ -26,29 +28,67 @@ interface FileInputProps {
 }
 
 const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
-  ({ id, label = 'Pilih file', accept, onChange, value = [], categoryOptions, editableName = true, showCategory = true, showSemester = true, namePlaceholder = 'Nama file' }, ref) => {
+  ({ id, label = 'Pilih file', accept, multiple = true, layout = 'card', onChange, value = [], categoryOptions, editableName = true, showCategory = true, showSemester = true, namePlaceholder = 'Nama file' }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
+    const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
-    const handleClick = () => {
+    const handleClick = (e?: React.MouseEvent | number) => {
+      if (typeof e === 'number') setUploadingIndex(e);
       inputRef.current?.click();
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(e.target.files || []);
-      const newFiles = selectedFiles.map(file => ({ file, name: '', category: '', semester: undefined }));
-      onChange?.([...value, ...newFiles]);
+      if (uploadingIndex !== null && uploadingIndex < value.length) {
+        const selectedFile = selectedFiles[0];
+        if (selectedFile) {
+          const newValue = [...value];
+          newValue[uploadingIndex] = { ...newValue[uploadingIndex], file: selectedFile };
+          onChange?.(newValue);
+        }
+      } else {
+        let newFiles = selectedFiles.map(file => ({ file, name: '', category: '' }));
+        if (!multiple && value.length > 0) {
+          const existing = value[0];
+          newFiles = newFiles.map(file => ({
+            ...file,
+            name: existing.name,
+            category: existing.category || '',
+            semester: existing.semester,
+          }));
+        }
+        onChange?.(multiple ? [...value, ...newFiles] : newFiles);
+      }
       if (inputRef.current) {
         inputRef.current.value = '';
       }
     };
 
-    const handleDrop = (e: React.DragEvent) => {
+    const handleDrop = (e: React.DragEvent, index?: number) => {
       e.preventDefault();
       setIsDragOver(false);
       const selectedFiles = Array.from(e.dataTransfer.files);
-      const newFiles = selectedFiles.map(file => ({ file, name: '', category: '', semester: undefined }));
-      onChange?.([...value, ...newFiles]);
+      if (index !== undefined && index < value.length) {
+        const selectedFile = selectedFiles[0];
+        if (selectedFile) {
+          const newValue = [...value];
+          newValue[index] = { ...newValue[index], file: selectedFile };
+          onChange?.(newValue);
+        }
+      } else {
+        let newFiles = selectedFiles.map(file => ({ file, name: '', category: '' }));
+        if (!multiple && value.length > 0) {
+          const existing = value[0];
+          newFiles = newFiles.map(file => ({
+            ...file,
+            name: existing.name,
+            category: existing.category || '',
+            semester: existing.semester,
+          }));
+        }
+        onChange?.(multiple ? [...value, ...newFiles] : newFiles);
+      }
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -86,32 +126,67 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
       onChange?.(newFiles);
     };
 
+    const updateName = (name: string) => {
+      if (value.length > 0) {
+        onChange?.([{ ...value[0], name }]);
+      }
+    };
+  
+    const updateCategory = (category: string) => {
+      if (value.length > 0) {
+        onChange?.([{ ...value[0], category }]);
+      }
+    };
+  
+    const updateSemester = (semester: number) => {
+      if (value.length > 0) {
+        onChange?.([{ ...value[0], semester }]);
+      }
+    };
+  
     return (
       <div className="space-y-2">
         {label && <Label htmlFor={id}>{label}</Label>}
-        {value.length > 0 && (
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+        {layout === 'grid' ? (
+          <div className="space-y-6 max-w-2xl">
             {value.map((item, index) => (
-              <Card key={index} className="p-3">
-                <div className="flex items-center gap-3">
-                  <File className="h-6 w-6 text-muted-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0 space-y-1">
-                    {editableName ? (
-                      <Input
-                        value={item.name}
-                        onChange={(e) => updateFileName(index, e.target.value)}
-                        className="text-sm h-8"
-                        placeholder={namePlaceholder}
-                      />
-                    ) : (
-                      <p className="text-sm font-medium truncate">{item.name}</p>
+              <div key={index} className="space-y-4 p-4 border rounded-lg">
+                {multiple && value.length > 1 && (
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-medium">Project {index + 1}</h4>
+                    {value.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     )}
-                    {showCategory && categoryOptions && (
+                  </div>
+                )}
+                {editableName && (
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Nama Project</Label>
+                    <Input
+                      value={item.name}
+                      onChange={(e) => multiple ? updateFileName(index, e.target.value) : updateName(e.target.value)}
+                      placeholder={namePlaceholder}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {showCategory && categoryOptions && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Kategori</Label>
                       <Select
                         value={item.category || ''}
-                        onValueChange={(value) => updateFileCategory(index, value)}
+                        onValueChange={(value) => multiple ? updateFileCategory(index, value) : updateCategory(value)}
                       >
-                        <SelectTrigger className="w-full h-8">
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih kategori" />
                         </SelectTrigger>
                         <SelectContent>
@@ -122,13 +197,16 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                           ))}
                         </SelectContent>
                       </Select>
-                    )}
-                    {showSemester && (
+                    </div>
+                  )}
+                  {showSemester && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Semester</Label>
                       <Select
                         value={item.semester ? item.semester.toString() : undefined}
-                        onValueChange={(value) => updateFileSemester(index, parseInt(value))}
+                        onValueChange={(value) => multiple ? updateFileSemester(index, parseInt(value)) : updateSemester(parseInt(value))}
                       >
-                        <SelectTrigger className="w-full h-8">
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih semester" />
                         </SelectTrigger>
                         <SelectContent>
@@ -139,57 +217,179 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                           ))}
                         </SelectContent>
                       </Select>
-                    )}
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium" htmlFor="">File Project</Label>
+                  <Card
+                    className={`border-2 border-dashed transition-colors cursor-pointer ${
+                      isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+                    }`}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onClick={() => handleClick(index)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        {item.file && (item.file.size > 0 || item.existingFileSize) ? (
+                          <>
+                            <File className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                            <p className="text-sm truncate" title={item.file.name}>{item.file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.existingFileSize || `${(item.file.size / 1024 / 1024).toFixed(2)} MB`}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Klik atau seret file baru untuk mengganti
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                            <p className="text-xs text-muted-foreground">
+                              Klik untuk upload file
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <Input
+                        ref={ref || inputRef}
+                        type="file"
+                        accept={accept}
+                        multiple={multiple}
+                        onChange={handleChange}
+                        className="hidden"
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ))}
+            {multiple && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onChange?.([...value, { file: undefined, name: '', category: '', semester: undefined }])}
+                className="w-full"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Tambah Project Lain
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
+            {value.length > 0 && (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {value.map((item, index) => (
+                  <Card key={index} className="p-3">
+                    <div className="flex items-center gap-3">
+                      <File className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0 space-y-2">
+                        {editableName && (
+                          <div>
+                            <Label className="text-xs">Nama Project</Label>
+                            <Input
+                              value={item.name}
+                              onChange={(e) => updateFileName(index, e.target.value)}
+                              className="text-sm h-8"
+                              placeholder={namePlaceholder}
+                            />
+                          </div>
+                        )}
+                        {showCategory && categoryOptions && (
+                          <div>
+                            <Label className="text-xs">Kategori</Label>
+                            <Select
+                              value={item.category || ''}
+                              onValueChange={(value) => updateFileCategory(index, value)}
+                            >
+                              <SelectTrigger className="w-full h-8">
+                                <SelectValue placeholder="Pilih kategori" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categoryOptions.filter(option => option.value !== '').map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {showSemester && (
+                          <div>
+                            <Label className="text-xs">Semester</Label>
+                            <Select
+                              value={item.semester ? item.semester.toString() : undefined}
+                              onValueChange={(value) => updateFileSemester(index, parseInt(value))}
+                            >
+                              <SelectTrigger className="w-full h-8">
+                                <SelectValue placeholder="Pilih semester" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 8 }, (_, i) => i + 1).map((semester) => (
+                                  <SelectItem key={semester} value={semester.toString()}>
+                                    Semester {semester}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {item.existingFileSize || (item.file ? `${(item.file.size / 1024 / 1024).toFixed(2)} MB` : '')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="text-muted-foreground hover:text-destructive flex-shrink-0 h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+            <Card
+              className={`border-2 border-dashed transition-colors cursor-pointer ${
+                isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+              }`}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={handleClick}
+            >
+              <CardContent className="p-6">
+                <div className="text-center">
+                  <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">
+                      Upload
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {item.existingFileSize || `${(item.file.size / 1024 / 1024).toFixed(2)} MB`}
+                      Seret dan jatuhkan atau klik untuk memilih
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFile(index)}
-                    className="text-muted-foreground hover:text-destructive flex-shrink-0 h-8 w-8 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
                 </div>
-              </Card>
-            ))}
-          </div>
+                <Input
+                  ref={ref || inputRef}
+                  id={id}
+                  type="file"
+                  accept={accept}
+                  multiple={multiple}
+                  onChange={handleChange}
+                  className="hidden"
+                />
+              </CardContent>
+            </Card>
+          </>
         )}
-        <Card
-          className={`border-2 border-dashed transition-colors cursor-pointer ${
-            isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
-          }`}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={handleClick}
-        >
-          <CardContent className="p-6">
-            <div className="text-center">
-              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <div className="space-y-2">
-                <p className="text-sm font-medium">
-                  Upload
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Seret dan jatuhkan atau klik untuk memilih
-                </p>
-              </div>
-            </div>
-            <Input
-              ref={ref || inputRef}
-              id={id}
-              type="file"
-              accept={accept}
-              multiple
-              onChange={handleChange}
-              className="hidden"
-            />
-          </CardContent>
-        </Card>
       </div>
     );
   }

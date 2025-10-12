@@ -93,7 +93,7 @@ interface FilterForm {
 }
 
 interface ProjectForm {
-  files: { file: File; name: string; category: string; semester?: number; existingFileSize?: string }[];
+  files: { file?: File; name: string; category: string; semester?: number; existingFileSize?: string }[];
 }
 
 export default function Project() {
@@ -123,7 +123,7 @@ export default function Project() {
 
   const createForm = useForm<ProjectForm>({
     defaultValues: {
-      files: [],
+      files: [{ file: undefined, name: '', category: '', semester: undefined }],
     },
   });
 
@@ -261,7 +261,7 @@ export default function Project() {
       }
 
       await projectAPI.createProjects({
-        files: files.map(f => f.file),
+        files: files.map(f => f.file as File),
         nama_project: files.map(f => f.name),
         kategori: files.map(f => f.category),
         semester: files.map(f => f.semester!),
@@ -298,7 +298,7 @@ export default function Project() {
         nama_project: fileData.name,
         kategori: fileData.category,
         semester: fileData.semester,
-        file: fileData.file.size > 0 ? fileData.file : undefined,
+        file: fileData.file && fileData.file.size > 0 ? fileData.file : undefined,
       });
 
       setIsEditOpen(false);
@@ -578,12 +578,14 @@ export default function Project() {
                   <FormItem>
                     <FormControl>
                       <FileInput
-                        label="Upload Project"
+                        label=""
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
                         categoryOptions={categoryOptions}
                         editableName={true}
                         namePlaceholder="Nama project"
+                        layout="grid"
+                        multiple={true}
                       />
                     </FormControl>
                   </FormItem>
@@ -620,12 +622,14 @@ export default function Project() {
                   <FormItem>
                     <FormControl>
                       <FileInput
-                        label="Upload Project Baru"
+                        label=""
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
                         categoryOptions={categoryOptions}
                         editableName={true}
                         namePlaceholder="Nama project"
+                        multiple={false}
+                        layout="grid"
                       />
                     </FormControl>
                   </FormItem>
