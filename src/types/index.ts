@@ -251,11 +251,13 @@ export interface ProjectUpdateResponse extends BaseResponse {
 export interface ProjectCreateRequest {
   files: File[];
   nama_project: string[];
+  kategori: string[];
   semester: number[];
 }
 
 export interface ProjectUpdateRequest {
   nama_project?: string;
+  kategori?: string;
   semester?: number;
   file?: File;
 }

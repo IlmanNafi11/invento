@@ -62,17 +62,18 @@ class ProjectAPI {
   async createProjects(projectData: ProjectCreateRequest): Promise<ProjectCreateResponse> {
     const formData = new FormData();
 
-    // Add files
     projectData.files.forEach((file) => {
       formData.append('files', file);
     });
 
-    // Add nama_project array
     projectData.nama_project.forEach(name => {
       formData.append('nama_project', name);
     });
 
-    // Add semester array
+    projectData.kategori.forEach(kat => {
+      formData.append('kategori', kat);
+    });
+
     projectData.semester.forEach(sem => {
       formData.append('semester', sem.toString());
     });
@@ -88,6 +89,9 @@ class ProjectAPI {
 
     if (projectData.nama_project) {
       formData.append('nama_project', projectData.nama_project);
+    }
+    if (projectData.kategori) {
+      formData.append('kategori', projectData.kategori);
     }
     if (projectData.semester !== undefined) {
       formData.append('semester', projectData.semester.toString());

@@ -263,6 +263,7 @@ export default function Project() {
       await projectAPI.createProjects({
         files: files.map(f => f.file),
         nama_project: files.map(f => f.name),
+        kategori: files.map(f => f.category),
         semester: files.map(f => f.semester!),
       });
 
@@ -295,6 +296,7 @@ export default function Project() {
 
       await projectAPI.updateProject(editingItem.id, {
         nama_project: fileData.name,
+        kategori: fileData.category,
         semester: fileData.semester,
         file: fileData.file.size > 0 ? fileData.file : undefined,
       });
