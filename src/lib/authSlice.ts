@@ -29,8 +29,8 @@ const loadAuthState = (): AuthState => {
         isAuthenticated: true,
       };
     }
-  } catch (error) {
-    console.error('Error loading auth state:', error);
+  } catch {
+    return initialState;
   }
   return initialState;
 };

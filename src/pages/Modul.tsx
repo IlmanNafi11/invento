@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Upload, Search, Filter, Edit, Trash2, Download, Loader2 } from 'lucide-react';
@@ -43,6 +41,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -53,10 +58,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
+import { Progress } from '@/components/ui/progress';
 import { FileInput } from '@/components/common/FileInput';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { formatDate } from '@/utils/format';
@@ -66,23 +73,40 @@ import { modulAPI } from '@/lib/modulAPI';
 import type { ModulListItem, ErrorResponse, ValidationErrorResponse } from '@/types';
 
 const fileTypeOptions: { value: string; label: string }[] = [
-  { value: '', label: 'Semua' },
+  { value: 'all', label: 'Semua' },
   { value: 'pdf', label: 'PDF' },
   { value: 'docx', label: 'DOCX' },
   { value: 'xlsx', label: 'XLSX' },
   { value: 'pptx', label: 'PPTX' },
-  { value: 'jpg', label: 'JPG' },
-  { value: 'png', label: 'PNG' },
-  { value: 'jpeg', label: 'JPEG' },
-  { value: 'gif', label: 'GIF' },
+];
+
+const semesterOptions: { value: string; label: string }[] = [
+  { value: 'all', label: 'Semua' },
+  { value: '1', label: 'Semester 1' },
+  { value: '2', label: 'Semester 2' },
+  { value: '3', label: 'Semester 3' },
+  { value: '4', label: 'Semester 4' },
+  { value: '5', label: 'Semester 5' },
+  { value: '6', label: 'Semester 6' },
+  { value: '7', label: 'Semester 7' },
+  { value: '8', label: 'Semester 8' },
 ];
 
 interface FilterForm {
   fileType: string;
+  semester: string;
 }
 
 interface ModulForm {
-  files: { file: File; name: string; existingFileSize?: string }[];
+  files: { file?: File; name: string; semester?: number; existingFileSize?: string }[];
+}
+
+interface FileUploadState {
+  index: number;
+  fileName: string;
+  progress: number;
+  status: 'waiting' | 'uploading' | 'completed' | 'error';
+  error?: string;
 }
 
 export default function Modul() {
@@ -95,22 +119,25 @@ export default function Modul() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<ModulListItem | null>(null);
-  const [isCreateLoading, setIsCreateLoading] = useState(false);
   const [isEditLoading, setIsEditLoading] = useState(false);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [editingItem, setEditingItem] = useState<ModulListItem | null>(null);
+  const [uploadStates, setUploadStates] = useState<FileUploadState[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const [pendingFileType, setPendingFileType] = useState<string>('');
+  const [pendingFileType, setPendingFileType] = useState<string>('all');
+  const [pendingSemester, setPendingSemester] = useState<string>('all');
 
   const filterForm = useForm<FilterForm>({
     defaultValues: {
-      fileType: '',
+      fileType: 'all',
+      semester: 'all',
     },
   });
 
   const createForm = useForm<ModulForm>({
     defaultValues: {
-      files: [{ file: undefined, name: '' }],
+      files: [{ file: undefined, name: '', semester: undefined }],
     },
   });
 
@@ -123,6 +150,11 @@ export default function Modul() {
   const fileType = useWatch({
     control: filterForm.control,
     name: 'fileType',
+  });
+
+  const semester = useWatch({
+    control: filterForm.control,
+    name: 'semester',
   });
 
   const debouncedSearch = useDebounce(search, 500);
@@ -138,6 +170,14 @@ export default function Modul() {
       cell: ({ getValue }) => {
         const tipe = getValue<string>();
         return fileTypeOptions.find(option => option.value === tipe)?.label || tipe.toUpperCase();
+      },
+    },
+    {
+      accessorKey: 'semester',
+      header: 'Semester',
+      cell: ({ getValue }) => {
+        const sem = getValue<number>();
+        return `Semester ${sem}`;
       },
     },
     {
@@ -161,7 +201,7 @@ export default function Modul() {
           >
             <Download className="h-4 w-4" />
           </Button>
-          {hasPermission('modul', 'update') && (
+          {hasPermission('Modul', 'update') && (
             <Button
               variant="ghost"
               size="sm"
@@ -170,7 +210,7 @@ export default function Modul() {
               <Edit className="h-4 w-4" />
             </Button>
           )}
-          {hasPermission('modul', 'delete') && (
+          {hasPermission('Modul', 'delete') && (
             <Button
               variant="ghost"
               size="sm"
@@ -199,6 +239,7 @@ export default function Modul() {
       const params: {
         search?: string;
         filter_type?: string;
+        filter_semester?: number;
         page?: number;
         limit?: number;
       } = {
@@ -207,7 +248,8 @@ export default function Modul() {
       };
 
       if (debouncedSearch) params.search = debouncedSearch;
-      if (fileType) params.filter_type = fileType;
+      if (fileType && fileType !== 'all') params.filter_type = fileType;
+      if (semester && semester !== 'all') params.filter_semester = parseInt(semester);
 
       const response = await modulAPI.getModuls(params);
       setModuls(response.data.items || []);
@@ -216,47 +258,106 @@ export default function Modul() {
       const err = error as ErrorResponse | ValidationErrorResponse;
       toast.error(err.message || 'Gagal memuat data modul');
     }
-  }, [debouncedSearch, fileType]);
+  }, [debouncedSearch, fileType, semester]);
 
   const handleApplyFilter = () => {
     filterForm.setValue('fileType', pendingFileType);
+    filterForm.setValue('semester', pendingSemester);
     setFilterOpen(false);
   };
 
   const handleResetFilter = () => {
-    setPendingFileType('');
-    filterForm.setValue('fileType', '');
+    setPendingFileType('all');
+    setPendingSemester('all');
+    filterForm.setValue('fileType', 'all');
+    filterForm.setValue('semester', 'all');
   };
 
   const handleCreate = createForm.handleSubmit(async (data) => {
+    const files = data.files.filter(f => f.file && f.name && f.semester);
+    if (files.length === 0) {
+      toast.error('Harap lengkapi nama file dan semester untuk setiap file yang diupload');
+      return;
+    }
+
+    if (files.length > 5) {
+      toast.error('Maksimal 5 file per upload');
+      return;
+    }
+
+    for (const fileData of files) {
+      if (fileData.file) {
+        const validation = modulAPI.validateModulFile(fileData.file);
+        if (!validation.valid) {
+          toast.error(`${fileData.file.name}: ${validation.error}`);
+          return;
+        }
+      }
+    }
+
+    setIsUploading(true);
+
+    const initialStates: FileUploadState[] = files.map((f, i) => ({
+      index: i,
+      fileName: f.file!.name,
+      progress: 0,
+      status: 'waiting' as const,
+    }));
+    setUploadStates(initialStates);
+
+    const filesList = files.map(f => f.file!);
+    const namesList = files.map(f => f.name);
+    const semestersList = files.map(f => f.semester || 1);
+
     try {
-      setIsCreateLoading(true);
-      const files = data.files.filter(f => f.file && f.name);
-      if (files.length === 0) {
-        toast.error('Harap lengkapi nama file untuk setiap file yang diupload');
-        return;
+      await modulAPI.uploadMultipleModuls(
+        filesList,
+        namesList,
+        semestersList,
+        (fileIndex, progress) => {
+          setUploadStates(prev => prev.map(state =>
+            state.index === fileIndex
+              ? { ...state, progress, status: 'uploading' as const }
+              : state
+          ));
+        },
+        (fileIndex) => {
+          setUploadStates(prev => prev.map(state =>
+            state.index === fileIndex
+              ? { ...state, progress: 100, status: 'completed' as const }
+              : state
+          ));
+        },
+        (fileIndex, error) => {
+          setUploadStates(prev => prev.map(state =>
+            state.index === fileIndex
+              ? { ...state, status: 'error' as const, error: error.message }
+              : state
+          ));
+          toast.error(`${files[fileIndex].file!.name}: ${error.message}`);
+        }
+      );
+
+      const allCompleted = uploadStates.every(state => state.status === 'completed');
+      if (allCompleted) {
+        setIsCreateOpen(false);
+        createForm.reset();
+        setUploadStates([]);
+        toast.success('Semua modul berhasil diupload');
+        fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
       }
-
-      await modulAPI.createModuls({
-        files: files.map(f => f.file),
-        nama_file: files.map(f => f.name),
-      });
-
-      setIsCreateOpen(false);
-      createForm.reset();
-      toast.success('Modul berhasil ditambahkan');
-      fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
     } catch (error) {
-      const err = error as ErrorResponse | ValidationErrorResponse;
-      if ('errors' in err && err.errors) {
-        (err.errors as import('@/types').ValidationError[]).forEach((e) => toast.error(e.message));
-      } else {
-        toast.error(err.message || 'Gagal menambahkan modul');
-      }
+      const err = error as Error;
+      toast.error(err.message || 'Gagal mengupload modul');
     } finally {
-      setIsCreateLoading(false);
+      setIsUploading(false);
     }
   });
+
+  const hasMetadataChanged = (fileData: { name: string; semester?: number }): boolean => {
+    if (!editingItem) return false;
+    return fileData.name !== editingItem.nama_file || fileData.semester !== editingItem.semester;
+  };
 
   const handleEdit = editForm.handleSubmit(async (data) => {
     if (!editingItem) return;
@@ -264,21 +365,107 @@ export default function Modul() {
     try {
       setIsEditLoading(true);
       const fileData = data.files[0];
-      if (!fileData || !fileData.name) {
-        toast.error('Harap lengkapi nama file');
+      
+      if (!fileData || !fileData.name || !fileData.semester) {
+        toast.error('Harap lengkapi nama file dan semester');
         return;
       }
 
-      await modulAPI.updateModul(editingItem.id, {
-        nama_file: fileData.name,
-        file: fileData.file.size > 0 ? fileData.file : undefined,
-      });
+      const isNewFileUploaded = fileData.file && fileData.file.size > 0;
+      const metadataChanged = hasMetadataChanged(fileData);
 
-      setIsEditOpen(false);
-      setEditingItem(null);
-      editForm.reset();
-      toast.success('Modul berhasil diperbarui');
-      fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+      if (!isNewFileUploaded && !metadataChanged) {
+        toast.info('Tidak ada perubahan yang disimpan');
+        return;
+      }
+
+      if (!isNewFileUploaded && metadataChanged) {
+        await modulAPI.updateModulMetadata(editingItem.id, {
+          nama_file: fileData.name,
+          semester: fileData.semester || 1,
+        });
+        
+        setIsEditOpen(false);
+        setEditingItem(null);
+        editForm.reset();
+        toast.success('Metadata modul berhasil diperbarui');
+        fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+        return;
+      }
+
+      if (isNewFileUploaded) {
+        const fileType = modulAPI.getFileType(fileData.file!);
+        
+        const uploadMetadata: { nama_file: string; tipe: string; semester: string } = {
+          nama_file: fileData.name,
+          tipe: fileType,
+          semester: fileData.semester?.toString() || '1',
+        };
+
+        setUploadStates([{
+          index: 0,
+          fileName: fileData.file!.name,
+          progress: 0,
+          status: 'waiting' as const,
+        }]);
+
+        try {
+          toast.info(`Menunggu slot upload untuk update ${fileData.file!.name}...`);
+          
+          await modulAPI.pollAndUpdateModulWithChunks(
+            editingItem.id,
+            fileData.file!,
+            uploadMetadata,
+            {
+              onProgress: (progress) => {
+                setUploadStates([{
+                  index: 0,
+                  fileName: fileData.file!.name,
+                  progress: progress.percentage,
+                  status: 'uploading' as const,
+                }]);
+              },
+              onSuccess: () => {
+                setUploadStates([{
+                  index: 0,
+                  fileName: fileData.file!.name,
+                  progress: 100,
+                  status: 'completed' as const,
+                }]);
+                
+                setTimeout(() => {
+                  setUploadStates([]);
+                  setIsEditOpen(false);
+                  setEditingItem(null);
+                  editForm.reset();
+                  toast.success('Modul berhasil diperbarui');
+                  fetchModuls(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+                }, 1000);
+              },
+              onError: (error) => {
+                setUploadStates([{
+                  index: 0,
+                  fileName: fileData.file!.name,
+                  progress: 0,
+                  status: 'error' as const,
+                  error: error.message,
+                }]);
+                toast.error(error.message);
+              },
+            }
+          );
+          
+          const metadataMsg = metadataChanged 
+            ? ' (nama file diperbarui)' 
+            : '';
+          toast.success(`Update dimulai${metadataMsg}`);
+        } catch (error) {
+          const err = error as Error;
+          setUploadStates([]);
+          toast.error(err.message);
+        }
+      }
+      
     } catch (error) {
       const err = error as ErrorResponse | ValidationErrorResponse;
       if ('errors' in err && err.errors) {
@@ -329,7 +516,7 @@ export default function Modul() {
 
   const openEditDialog = (item: ModulListItem) => {
     setEditingItem(item);
-    editForm.setValue('files', [{ file: new File([], item.nama_file), name: item.nama_file, existingFileSize: item.ukuran }]);
+    editForm.setValue('files', [{ file: new File([], item.nama_file), name: item.nama_file, semester: item.semester, existingFileSize: item.ukuran }]);
     setIsEditOpen(true);
   };
 
@@ -361,9 +548,9 @@ export default function Modul() {
               <Button variant="outline" className="relative">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
-                {fileType && (
+                {(fileType && fileType !== 'all' || semester && semester !== 'all') && (
                   <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    1
+                    {[fileType !== 'all' ? fileType : null, semester !== 'all' ? semester : null].filter(Boolean).length}
                   </Badge>
                 )}
               </Button>
@@ -407,6 +594,21 @@ export default function Modul() {
                     </PopoverContent>
                   </Popover>
                 </div>
+                <div className="space-y-2">
+                  <Label>Semester</Label>
+                  <Select value={pendingSemester} onValueChange={setPendingSemester}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih semester" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {semesterOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex gap-2">
                   <Button onClick={handleApplyFilter} className="flex-1">
                     Terapkan
@@ -418,13 +620,45 @@ export default function Modul() {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          {hasPermission('modul', 'create') && (
+          {hasPermission('Modul', 'create') && (
             <Button onClick={() => setIsCreateOpen(true)} size="icon">
               <Upload className="h-4 w-4" />
             </Button>
           )}
         </div>
       </div>
+
+      {uploadStates.length > 0 && (
+        <div className="space-y-2 p-4 border rounded-lg">
+          <h3 className="text-sm font-medium">Upload Progress</h3>
+          {uploadStates.map((state) => (
+            <div key={state.index} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm truncate flex-1">{state.fileName}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    {state.status === 'waiting' && 'Menunggu...'}
+                    {state.status === 'uploading' && `${state.progress}%`}
+                    {state.status === 'completed' && 'Selesai'}
+                    {state.status === 'error' && 'Error'}
+                  </span>
+                  {state.status === 'completed' && (
+                    <Badge variant="default" className="h-5">✓</Badge>
+                  )}
+                  {state.status === 'error' && (
+                    <Badge variant="destructive" className="h-5">✗</Badge>
+                  )}
+                </div>
+              </div>
+              <Progress value={state.progress} />
+              {state.error && (
+                <p className="text-sm text-destructive">{state.error}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -500,6 +734,9 @@ export default function Modul() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Upload Modul</DialogTitle>
+            <DialogDescription>
+              Upload modul (max 5 file, 50MB per file, format: DOCX, XLSX, PDF, PPTX)
+            </DialogDescription>
           </DialogHeader>
           <Form {...createForm}>
             <form onSubmit={handleCreate} className="space-y-4">
@@ -510,16 +747,15 @@ export default function Modul() {
                   <FormItem>
                     <FormControl>
                       <FileInput
-                        label="Upload Modul"
+                        label=""
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
                         showCategory={false}
-                        showSemester={false}
+                        showSemester={true}
+                        editableName={true}
                         namePlaceholder="Nama modul"
                         layout="grid"
-                        nameLabel="Nama Modul"
-                        addButtonLabel="Tambah Modul Lain"
-                        fileLabel="File Modul"
+                        multiple={true}
                       />
                     </FormControl>
                   </FormItem>
@@ -529,8 +765,8 @@ export default function Modul() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit" disabled={isCreateLoading}>
-                  {isCreateLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button type="submit" disabled={isUploading}>
+                  {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Upload
                 </Button>
               </div>
@@ -543,6 +779,9 @@ export default function Modul() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Modul</DialogTitle>
+            <DialogDescription>
+              Edit nama atau upload file baru (max 50MB, format: DOCX, XLSX, PDF, PPTX)
+            </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={handleEdit} className="space-y-4">
@@ -553,16 +792,15 @@ export default function Modul() {
                   <FormItem>
                     <FormControl>
                       <FileInput
-                        label="Upload Modul Baru"
+                        label=""
                         onChange={(files) => field.onChange(files)}
                         value={field.value}
                         showCategory={false}
-                        showSemester={false}
+                        showSemester={true}
+                        editableName={true}
                         namePlaceholder="Nama modul"
                         multiple={false}
                         layout="grid"
-                        nameLabel="Nama Modul"
-                        fileLabel="File Modul"
                       />
                     </FormControl>
                   </FormItem>

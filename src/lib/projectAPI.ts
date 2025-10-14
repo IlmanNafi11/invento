@@ -1,23 +1,26 @@
 import type {
   ProjectListResponse,
-  ProjectCreateResponse,
-  ProjectUpdateResponse,
   SuccessResponse,
   ErrorResponse,
   ValidationErrorResponse,
-  ProjectCreateRequest,
-  ProjectUpdateRequest,
+  UploadInfoResponse,
+  UploadSlotResponse,
+  ProjectUpdateMetadataRequest,
+  ProjectUpdateMetadataResponse,
 } from '@/types';
+import { tusHelper, type ProjectUploadMetadata, type UploadCallbacks, type ActiveUpload } from './tusHelper';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
-class ProjectAPI {
+class ProjectAPIClient {
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('access_token');
     return {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
+
+
 
   private async request<T>(
     endpoint: string,
@@ -39,6 +42,36 @@ class ProjectAPI {
     return data as T;
   }
 
+  private buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value));
+      }
+    });
+    return searchParams.toString();
+  }
+
+  validateFileSize(file: File): boolean {
+    return tusHelper.validateFileSize(file);
+  }
+
+  validateFileType(file: File): boolean {
+    return tusHelper.validateFileType(file);
+  }
+
+  async checkUploadSlot(): Promise<UploadSlotResponse> {
+    return tusHelper.checkUploadSlot();
+  }
+
+  async resetUploadQueue(): Promise<SuccessResponse> {
+    return tusHelper.resetUploadQueue();
+  }
+
+  async checkUploadSlotWithRetry(maxRetries = 1): Promise<{ response: UploadSlotResponse; wasReset: boolean }> {
+    return tusHelper.checkUploadSlotWithRetry(maxRetries);
+  }
+
   async getProjects(params?: {
     search?: string;
     filter_semester?: number;
@@ -46,63 +79,101 @@ class ProjectAPI {
     page?: number;
     limit?: number;
   }): Promise<ProjectListResponse> {
-    const searchParams = new URLSearchParams();
-    if (params?.search) searchParams.append('search', params.search);
-    if (params?.filter_semester) searchParams.append('filter_semester', params.filter_semester.toString());
-    if (params?.filter_kategori) searchParams.append('filter_kategori', params.filter_kategori);
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-
-    const query = searchParams.toString();
+    const query = this.buildQueryString(params || {});
     const endpoint = `/project${query ? `?${query}` : ''}`;
-
     return this.request<ProjectListResponse>(endpoint);
   }
 
-  async createProjects(projectData: ProjectCreateRequest): Promise<ProjectCreateResponse> {
-    const formData = new FormData();
 
-    projectData.files.forEach((file) => {
-      formData.append('files', file);
+
+  async uploadWithChunks(
+    file: File,
+    metadata: ProjectUploadMetadata,
+    callbacks: UploadCallbacks
+  ): Promise<ActiveUpload> {
+    const uploadId = await tusHelper.startUpload(file, {
+      metadata,
+      callbacks,
+      isUpdate: false,
+      type: 'project'
     });
 
-    projectData.nama_project.forEach(name => {
-      formData.append('nama_project', name);
-    });
+    const activeUpload = tusHelper.getActiveUpload(uploadId);
+    if (!activeUpload) {
+      throw new Error('Gagal memulai upload');
+    }
 
-    projectData.kategori.forEach(kat => {
-      formData.append('kategori', kat);
-    });
-
-    projectData.semester.forEach(sem => {
-      formData.append('semester', sem.toString());
-    });
-
-    return this.request<ProjectCreateResponse>('/project', {
-      method: 'POST',
-      body: formData,
-    });
+    return activeUpload;
   }
 
-  async updateProject(id: number, projectData: ProjectUpdateRequest): Promise<ProjectUpdateResponse> {
-    const formData = new FormData();
+  async pollAndUploadWithChunks(
+    file: File,
+    metadata: ProjectUploadMetadata,
+    callbacks: UploadCallbacks
+  ): Promise<ActiveUpload> {
+    await tusHelper.pollForAvailableSlot();
+    return this.uploadWithChunks(file, metadata, callbacks);
+  }
 
-    if (projectData.nama_project) {
-      formData.append('nama_project', projectData.nama_project);
-    }
-    if (projectData.kategori) {
-      formData.append('kategori', projectData.kategori);
-    }
-    if (projectData.semester !== undefined) {
-      formData.append('semester', projectData.semester.toString());
-    }
-    if (projectData.file) {
-      formData.append('file', projectData.file);
+  async updateProjectWithChunks(
+    id: number,
+    file: File,
+    metadata: ProjectUploadMetadata,
+    callbacks: UploadCallbacks,
+    hasMetadataChanged = false
+  ): Promise<ActiveUpload> {
+    const uploadId = await tusHelper.startUpload(file, {
+      metadata,
+      callbacks,
+      isUpdate: true,
+      projectId: id,
+      hasMetadataChanged,
+      type: 'project'
+    });
+
+    const activeUpload = tusHelper.getActiveUpload(uploadId);
+    if (!activeUpload) {
+      throw new Error('Gagal memulai update upload');
     }
 
-    return this.request<ProjectUpdateResponse>(`/project/${id}`, {
-      method: 'PUT',
-      body: formData,
+    return activeUpload;
+  }
+
+  async pollAndUpdateProjectWithChunks(
+    id: number,
+    file: File,
+    metadata: ProjectUploadMetadata,
+    callbacks: UploadCallbacks,
+    hasMetadataChanged = false
+  ): Promise<ActiveUpload> {
+    await tusHelper.pollForAvailableSlot();
+    return this.updateProjectWithChunks(id, file, metadata, callbacks, hasMetadataChanged);
+  }
+
+
+
+
+
+  async cancelUpload(uploadId: string): Promise<void> {
+    return tusHelper.cancelUpload(uploadId);
+  }
+
+  async getUploadInfo(uploadId: string): Promise<UploadInfoResponse> {
+    return this.request<UploadInfoResponse>(`/project/upload/${uploadId}`);
+  }
+
+  async getUploadStatus(uploadUrl: string): Promise<{ offset: number; length: number }> {
+    return tusHelper.getUploadStatus(uploadUrl);
+  }
+
+  async updateProjectMetadata(id: number, data: ProjectUpdateMetadataRequest): Promise<ProjectUpdateMetadataResponse> {
+    return this.request<ProjectUpdateMetadataResponse>(`/project/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
     });
   }
 
@@ -131,4 +202,4 @@ class ProjectAPI {
   }
 }
 
-export const projectAPI = new ProjectAPI();
+export const projectAPI = new ProjectAPIClient();

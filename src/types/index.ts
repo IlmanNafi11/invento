@@ -244,10 +244,6 @@ export interface ProjectCreateResponse extends BaseResponse {
   };
 }
 
-export interface ProjectUpdateResponse extends BaseResponse {
-  data: Project;
-}
-
 export interface ProjectCreateRequest {
   files: File[];
   nama_project: string[];
@@ -255,11 +251,60 @@ export interface ProjectCreateRequest {
   semester: number[];
 }
 
-export interface ProjectUpdateRequest {
-  nama_project?: string;
-  kategori?: string;
-  semester?: number;
-  file?: File;
+export interface ProjectUpdateMetadataRequest {
+  nama_project: string;
+  kategori: string;
+  semester: number;
+}
+
+export interface ProjectUpdateMetadataResponse extends BaseResponse {
+  data: null;
+}
+
+export interface UploadProgress {
+  uploadId: string;
+  fileName: string;
+  bytesUploaded: number;
+  bytesTotal: number;
+  percentage: number;
+}
+
+export interface UploadResponse extends BaseResponse {
+  data: {
+    upload_id: string;
+    upload_url: string;
+    offset: number;
+    length: number;
+  };
+}
+
+export interface UploadInfo {
+  upload_id: string;
+  nama_project: string;
+  kategori: ProjectCategory;
+  semester: number;
+  status: 'uploading' | 'completed' | 'cancelled' | 'failed';
+  progress: number;
+  offset: number;
+  length: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadInfoResponse extends BaseResponse {
+  data: UploadInfo;
+}
+
+export interface UploadSlot {
+  available: boolean;
+  message: string;
+  queue_length: number;
+  active_upload: boolean;
+  max_concurrent: number;
+}
+
+export interface UploadSlotResponse extends BaseResponse {
+  data: UploadSlot;
 }
 
 export interface Modul {
@@ -277,6 +322,7 @@ export interface ModulListItem {
   nama_file: string;
   tipe: string;
   ukuran: string;
+  semester: number;
   path_file: string;
   terakhir_diperbarui: string;
 }

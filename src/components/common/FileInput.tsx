@@ -181,7 +181,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                     />
                   </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${showCategory && categoryOptions && showSemester ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                   {showCategory && categoryOptions && (
                     <div className="space-y-1">
                       <Label className="text-sm font-medium">Kategori</Label>

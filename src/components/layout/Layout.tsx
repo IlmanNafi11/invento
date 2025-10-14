@@ -51,11 +51,7 @@ export default function Layout() {
   const [shouldNavigateToLogin, setShouldNavigateToLogin] = useState(false);
 
   const handleLogout = async () => {
-    try {
-      await authAPI.logout();
-    } catch (error) {
-      console.error('Logout API failed:', error);
-    }
+    await authAPI.logout();
 
     dispatch(logout());
     toast.success('Berhasil logout');
@@ -89,15 +85,6 @@ export default function Layout() {
   const hasFileManagerAccess = hasModulRead || hasProjectRead;
   const hasUserManagementAccess = hasUserRead || (hasRoleRead && hasPermissionRead);
 
-  console.log('[Layout] Permission checks:', {
-    hasModulRead,
-    hasProjectRead,
-    hasUserRead,
-    hasRoleRead,
-    hasPermissionRead,
-    hasFileManagerAccess,
-    hasUserManagementAccess,
-  });
 
   const sidebarContent = (
     <Sidebar collapsible="icon">

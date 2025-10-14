@@ -27,16 +27,12 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      console.log('[PermissionsProvider] Fetching permissions...');
       const response = await userAPI.getUserPermissions();
-      console.log('[PermissionsProvider] Raw response:', response);
-
+  
       const permissionsData = response.data;
-      console.log('[PermissionsProvider] Permissions data:', permissionsData);
 
       setPermissions(permissionsData);
-    } catch (err: unknown) {
-      console.error('[PermissionsProvider] Failed to fetch permissions:', err);
+    } catch {
       setError('Failed to load permissions');
       setPermissions([]);
     } finally {
@@ -59,7 +55,6 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       perm.actions.some(a => a.toLowerCase() === actionLower)
     );
 
-    console.log(`[PermissionsProvider] hasPermission(${resource}, ${action}):`, result);
     return result;
   }, [permissions]);
 
