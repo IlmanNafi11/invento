@@ -89,7 +89,7 @@ export default function Layout() {
   const sidebarContent = (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-2">
           <h2 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">Invento</h2>
           <SidebarTrigger />
         </div>
@@ -176,9 +176,9 @@ export default function Layout() {
               <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
               <AvatarFallback>{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
             </Avatar>
-            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-              <span className="text-sm font-medium">{userProfile?.name || currentUser?.name || 'Admin'}</span>
-              <span className="text-xs text-muted-foreground">{userProfile?.role || 'Admin'}</span>
+            <div className="flex flex-col group-data-[collapsible=icon]:hidden min-w-0">
+              <span className="text-sm font-medium truncate">{userProfile?.name || currentUser?.name || 'Admin'}</span>
+              <span className="text-xs text-muted-foreground truncate">{userProfile?.role || 'Admin'}</span>
             </div>
           </div>
         </DropdownMenuTrigger>
@@ -209,8 +209,9 @@ export default function Layout() {
   );
 
   const headerContent = (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6">
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6">
       <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Avatar className="h-8 w-8 cursor-pointer">
@@ -240,28 +241,27 @@ export default function Layout() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <ThemeToggle />
       </div>
     </header>
   );
 
   return (
-    <>
-      <SidebarProvider open={isOpen} onOpenChange={(open) => dispatch(setSidebarOpen(open))}>
-        {sidebarContent}
-        <main className="flex flex-1 flex-col">
-          {headerContent}
-          <div className="flex-1 p-6">
+    <SidebarProvider open={isOpen} onOpenChange={(open) => dispatch(setSidebarOpen(open))}>
+      {sidebarContent}
+      <main className="flex flex-1 flex-col h-screen overflow-hidden">
+        {headerContent}
+        <div className="flex-1 p-4 md:p-6 overflow-hidden">
+          <div className="h-full w-full overflow-auto">
             <Outlet />
           </div>
-        </main>
-      </SidebarProvider>
+        </div>
+      </main>
       <ProfileDialog
         user={userProfile}
         open={profileOpen}
         onOpenChange={setProfileOpen}
         onProfileUpdate={handleProfileUpdate}
       />
-    </>
+    </SidebarProvider>
   );
 }
