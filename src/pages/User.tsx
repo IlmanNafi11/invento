@@ -505,10 +505,10 @@ export default function User() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={userColumns.length} className="text-left py-2">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex flex-col gap-1">
-                    <h2 className="text-lg font-semibold">User</h2>
+              <TableHead colSpan={userColumns.length}>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <h3 className="text-base font-medium">User</h3>
                     <p className="text-xs text-muted-foreground">Kelola data pengguna</p>
                   </div>
                   <div className="lg:flex hidden flex-row items-center gap-4">
@@ -637,9 +637,9 @@ export default function User() {
           </TableBody>
           <TableFooter>
             <TableRow>
-              <TableCell colSpan={userColumns.length} className="text-left py-4">
+              <TableCell colSpan={userColumns.length} className="text-center">
                 <div className="flex items-center justify-between">
-                  <div className="flex-1 text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground">
                     Menampilkan {userTable.getFilteredRowModel().rows.length} dari {users.length} data
                   </div>
                   <div className="space-x-2">

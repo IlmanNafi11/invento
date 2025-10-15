@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Upload, Search, Filter, Edit, Trash2, Loader2, Download, X, File } from 'lucide-react';
+import { Upload, Search, Filter, Edit, Trash2, Loader2, Download, X, File, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useReactTable,
@@ -24,6 +24,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -52,7 +53,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -65,6 +65,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatDate } from '@/utils/format';
@@ -560,124 +561,122 @@ export default function Project() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-4">
-          <div className="relative min-w-0 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Cari project..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="relative">
-                <Filter className="h-4 w-4" />
-                {(semester || category) && (
-                  <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    {(semester ? 1 : 0) + (category ? 1 : 0)}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80">
-              <div className="p-4 space-y-4">
-                <div className="space-y-2">
-                  <Label>Semester</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {pendingSemester
-                          ? semesterOptions.find(option => option.value === pendingSemester)?.label
-                          : "Pilih semester"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Cari semester..." />
-                        <CommandList>
-                          <CommandEmpty>Tidak ada semester ditemukan.</CommandEmpty>
-                          <CommandGroup>
-                            {semesterOptions.map((option) => (
-                              <CommandItem
-                                key={option.value}
-                                value={option.value}
-                                onSelect={() => {
-                                  setPendingSemester(option.value === pendingSemester ? '' : option.value);
-                                }}
-                              >
-                                {option.label}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label>Kategori</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {pendingCategory
-                          ? categoryOptions.find(option => option.value === pendingCategory)?.label
-                          : "Pilih kategori"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Cari kategori..." />
-                        <CommandList>
-                          <CommandEmpty>Tidak ada kategori ditemukan.</CommandEmpty>
-                          <CommandGroup>
-                            {categoryOptions.map((option) => (
-                              <CommandItem
-                                key={option.value}
-                                value={option.value}
-                                onSelect={() => {
-                                  setPendingCategory(option.value === pendingCategory ? '' : option.value);
-                                }}
-                              >
-                                {option.label}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleApplyFilter} className="flex-1">
-                    Terapkan
-                  </Button>
-                  <Button variant="outline" onClick={handleResetFilter} className="flex-1">
-                    Reset
-                  </Button>
-                </div>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {hasPermission('Project', 'create') && (
-            <Button onClick={() => {
-              setIsCreateMode(true);
-              setIsCreateOpen(true);
-            }} size="icon">
-              <Upload className="h-4 w-4" />
-            </Button>
-          )}
+      <div className="flex items-center gap-4 ml-auto md:hidden">
+        <div className="relative min-w-0 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Cari project..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
+        <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="relative">
+              <Filter className="h-4 w-4" />
+              {(semester || category) && (
+                <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                  {(semester ? 1 : 0) + (category ? 1 : 0)}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-80">
+            <div className="p-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Semester</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {pendingSemester
+                        ? semesterOptions.find(option => option.value === pendingSemester)?.label
+                        : "Pilih semester"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Cari semester..." />
+                      <CommandList>
+                        <CommandEmpty>Tidak ada semester ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          {semesterOptions.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={option.value}
+                              onSelect={() => {
+                                setPendingSemester(option.value === pendingSemester ? '' : option.value);
+                              }}
+                            >
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Kategori</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {pendingCategory
+                        ? categoryOptions.find(option => option.value === pendingCategory)?.label
+                        : "Pilih kategori"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Cari kategori..." />
+                      <CommandList>
+                        <CommandEmpty>Tidak ada kategori ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          {categoryOptions.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={option.value}
+                              onSelect={() => {
+                                setPendingCategory(option.value === pendingCategory ? '' : option.value);
+                              }}
+                            >
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleApplyFilter} className="flex-1">
+                  Terapkan
+                </Button>
+                <Button variant="outline" onClick={handleResetFilter} className="flex-1">
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {hasPermission('Project', 'create') && (
+          <Button onClick={() => {
+            setIsCreateMode(true);
+            setIsCreateOpen(true);
+          }} size="icon">
+            <Upload className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {uploadStates.size > 0 && (
@@ -710,8 +709,135 @@ export default function Project() {
       <div className="rounded-md border">
         <Table>
           <TableHeader>
+            <TableRow>
+              <TableHead colSpan={columns.length}>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <h3 className="text-base font-medium">Project</h3>
+                    <p className="text-xs text-muted-foreground">Kelola Project anda</p>
+                  </div>
+                  <div className="hidden md:flex items-center gap-4">
+                    <div className="relative min-w-0 max-w-sm">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Cari project..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="relative">
+                          <Filter className="h-4 w-4" />
+                          {(semester || category) && (
+                            <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                              {(semester ? 1 : 0) + (category ? 1 : 0)}
+                            </Badge>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-80">
+                        <div className="p-4 space-y-4">
+                          <div className="space-y-2">
+                            <Label>Semester</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between"
+                                >
+                                  {pendingSemester
+                                    ? semesterOptions.find(option => option.value === pendingSemester)?.label
+                                    : "Pilih semester"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Cari semester..." />
+                                  <CommandList>
+                                    <CommandEmpty>Tidak ada semester ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {semesterOptions.map((option) => (
+                                        <CommandItem
+                                          key={option.value}
+                                          value={option.value}
+                                          onSelect={() => {
+                                            setPendingSemester(option.value === pendingSemester ? '' : option.value);
+                                          }}
+                                        >
+                                          {option.label}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Kategori</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between"
+                                >
+                                  {pendingCategory
+                                    ? categoryOptions.find(option => option.value === pendingCategory)?.label
+                                    : "Pilih kategori"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Cari kategori..." />
+                                  <CommandList>
+                                    <CommandEmpty>Tidak ada kategori ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {categoryOptions.map((option) => (
+                                        <CommandItem
+                                          key={option.value}
+                                          value={option.value}
+                                          onSelect={() => {
+                                            setPendingCategory(option.value === pendingCategory ? '' : option.value);
+                                          }}
+                                        >
+                                          {option.label}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button onClick={handleApplyFilter} className="flex-1">
+                              Terapkan
+                            </Button>
+                            <Button variant="outline" onClick={handleResetFilter} className="flex-1">
+                              Reset
+                            </Button>
+                          </div>
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {hasPermission('Project', 'create') && (
+                      <Button onClick={() => {
+                        setIsCreateMode(true);
+                        setIsCreateOpen(true);
+                      }} size="icon">
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </TableHead>
+            </TableRow>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-muted/50">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder
@@ -744,52 +870,61 @@ export default function Project() {
               </TableRow>
             )}
           </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Menampilkan {table.getFilteredRowModel().rows.length} dari {pagination.total_items} data
+                  </div>
+                  <div className="space-x-2">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => table.previousPage()}
+                            className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => table.setPageIndex(page - 1)}
+                              isActive={table.getState().pagination.pageIndex === page - 1}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => table.nextPage()}
+                            className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
-      </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          Menampilkan {table.getFilteredRowModel().rows.length} dari {pagination.total_items} data
-        </div>
-        <div className="space-x-2">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => table.previousPage()}
-                  className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-              {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => table.setPageIndex(page - 1)}
-                    isActive={table.getState().pagination.pageIndex === page - 1}
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => table.nextPage()}
-                  className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
       </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Upload Project</DialogTitle>
-            <DialogDescription>
-              Upload project files (max 500MB per file, format ZIP)
-            </DialogDescription>
           </DialogHeader>
           <Form {...createForm}>
             <form onSubmit={handleCreate} className="space-y-4">
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Format file harus berupa ZIP
+                </AlertDescription>
+              </Alert>
               <div className="space-y-4">
                 <FormField
                   control={createForm.control}
@@ -936,12 +1071,15 @@ export default function Project() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Project</DialogTitle>
-            <DialogDescription>
-              Edit nama, kategori, semester, atau upload file baru (max 500MB, format ZIP)
-            </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={handleEdit} className="space-y-4">
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Format file harus berupa ZIP
+                </AlertDescription>
+              </Alert>
               <div className="space-y-4">
                 <FormField
                   control={editForm.control}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
-import { Home, Code, Briefcase, Users, Shield, User, LogOut } from "lucide-react";
+import { Home, FileText, Briefcase, Users, Shield, User, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarFooter,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   Sidebar,
@@ -90,8 +91,8 @@ export default function Layout() {
 
   const sidebarContent = (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center justify-between px-2 group-data-[collapsible=icon]:justify-center">
+      <SidebarHeader className="h-16 border-b">
+        <div className="flex items-center justify-between px-2 group-data-[collapsible=icon]:justify-center h-full">
           <h2 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">Invento</h2>
           <SidebarTrigger />
         </div>
@@ -120,7 +121,7 @@ export default function Layout() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild>
                       <Link to="/modul">
-                        <Code />
+                        <FileText />
                         Modul
                       </Link>
                     </SidebarMenuButton>
@@ -171,7 +172,8 @@ export default function Layout() {
         )}
       </SidebarContent>
       <SidebarFooter>
-      <DropdownMenu>
+        <SidebarSeparator />
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <div className="flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent cursor-pointer group-data-[collapsible=icon]:justify-center">
             <Avatar className="h-8 w-8">
@@ -217,35 +219,43 @@ export default function Layout() {
       )}
       <div className={`flex items-center gap-2 ${isMobile ? '' : 'ml-auto'}`}>
         <ThemeToggle />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Avatar className="h-8 w-8 cursor-pointer">
-              <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
-              <AvatarFallback>{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-2 py-1.5 text-sm flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
-                <AvatarFallback className="text-xs">{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-medium">{userProfile?.name || currentUser?.name || 'Admin'}</div>
-                <div className="text-muted-foreground">{userProfile?.role || 'Admin'}</div>
+        {!isMobile && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-accent">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
+                  <AvatarFallback>{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-medium truncate">{userProfile?.name || currentUser?.name || 'Admin'}</span>
+                  <span className="text-xs text-muted-foreground truncate">{userProfile?.role || 'Admin'}</span>
+                </div>
               </div>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setProfileOpen(true)}>
-              <User className="mr-2 h-4 w-4" />
-              Profil
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Keluar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5 text-sm flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
+                  <AvatarFallback className="text-xs">{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-medium">{userProfile?.name || currentUser?.name || 'Admin'}</div>
+                  <div className="text-muted-foreground">{userProfile?.role || 'Admin'}</div>
+                </div>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                <User className="mr-2 h-4 w-4" />
+                Profil
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Keluar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </header>
   );

@@ -19,6 +19,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -229,7 +230,7 @@ export default function Role() {
     form: ReturnType<typeof useForm<RoleForm>>;
   }) => {
     return (
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="text-lg">{resource.name}</CardTitle>
         </CardHeader>
@@ -271,30 +272,54 @@ export default function Role() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex flex-row items-center gap-4 ml-auto">
-          <div className="relative min-w-0 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Cari role..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          {hasPermission('Role', 'create') && hasPermission('Permission', 'create') && (
-            <Button onClick={() => setIsCreateOpen(true)} size="sm" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            </Button>
-          )}
+      <div className="flex flex-row items-center gap-4 ml-auto md:hidden">
+        <div className="relative min-w-0 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Cari role..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
+        {hasPermission('Role', 'create') && hasPermission('Permission', 'create') && (
+          <Button onClick={() => setIsCreateOpen(true)} size="sm" disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
+            <TableRow>
+              <TableHead colSpan={columns.length}>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <h3 className="text-base font-medium">Role & Permission</h3>
+                    <p className="text-xs text-muted-foreground">Buat dan kelola permission setiap role</p>
+                  </div>
+                  <div className="hidden md:flex items-center gap-4">
+                    <div className="relative min-w-0 max-w-sm">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Cari role..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    {hasPermission('Role', 'create') && hasPermission('Permission', 'create') && (
+                      <Button onClick={() => setIsCreateOpen(true)} size="sm" disabled={loading}>
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </TableHead>
+            </TableRow>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-muted/50">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder
@@ -327,45 +352,50 @@ export default function Role() {
               </TableRow>
             )}
           </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Menampilkan {table.getFilteredRowModel().rows.length} dari {roles.length} data
+                  </div>
+                  <div className="space-x-2">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => table.previousPage()}
+                            className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => table.setPageIndex(page - 1)}
+                              isActive={table.getState().pagination.pageIndex === page - 1}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => table.nextPage()}
+                            className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
       </div>
 
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          Menampilkan {table.getFilteredRowModel().rows.length} dari {roles.length} data
-        </div>
-        <div className="space-x-2">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => table.previousPage()}
-                  className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-              {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => table.setPageIndex(page - 1)}
-                    isActive={table.getState().pagination.pageIndex === page - 1}
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => table.nextPage()}
-                  className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </div>
-
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="!max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tambah Role</DialogTitle>
           </DialogHeader>
@@ -383,9 +413,11 @@ export default function Role() {
                   </FormItem>
                 )}
               />
-              {permissions?.map((resource) => (
-                <PermissionCard key={resource.name} resource={resource} form={createForm} />
-              ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {permissions?.map((resource) => (
+                  <PermissionCard key={resource.name} resource={resource} form={createForm} />
+                ))}
+              </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Batal
@@ -401,7 +433,7 @@ export default function Role() {
       </Dialog>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="!max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Role</DialogTitle>
           </DialogHeader>
@@ -419,9 +451,11 @@ export default function Role() {
                   </FormItem>
                 )}
               />
-              {permissions?.map((resource) => (
-                <PermissionCard key={resource.name} resource={resource} form={editForm} />
-              ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {permissions?.map((resource) => (
+                  <PermissionCard key={resource.name} resource={resource} form={editForm} />
+                ))}
+              </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                   Batal

@@ -24,6 +24,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -59,7 +60,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -539,8 +539,8 @@ export default function Modul() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex items-center justify-end gap-4">
-        <div className="relative flex-1 min-w-0 max-w-sm">
+      <div className="flex items-center gap-4 ml-auto md:hidden">
+        <div className="relative min-w-0 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Cari modul..."
@@ -663,11 +663,113 @@ export default function Modul() {
         </div>
       )}
 
-      <div className="rounded-md border overflow-auto max-h-96">
+      <div className={`rounded-md border ${moduls.length > 0 ? 'overflow-auto max-h-96' : ''}`}>
         <Table>
           <TableHeader>
+            <TableRow>
+              <TableHead colSpan={columns.length}>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <h3 className="text-base font-medium">Modul</h3>
+                    <p className="text-xs text-muted-foreground">Kelola modul pembelajaran</p>
+                  </div>
+                  <div className="hidden md:flex items-center gap-4">
+                    <div className="relative min-w-0 max-w-sm">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Cari modul..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="relative">
+                          <Filter className="h-4 w-4" />
+                          {(fileType && fileType !== 'all' || semester && semester !== 'all') && (
+                            <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                              {[fileType !== 'all' ? fileType : null, semester !== 'all' ? semester : null].filter(Boolean).length}
+                            </Badge>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-80">
+                        <div className="p-4 space-y-4">
+                          <div className="space-y-2">
+                            <Label>Tipe File</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between"
+                                >
+                                  {pendingFileType
+                                    ? fileTypeOptions.find(option => option.value === pendingFileType)?.label
+                                    : "Pilih tipe file"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Cari tipe file..." />
+                                  <CommandList>
+                                    <CommandEmpty>Tidak ada tipe file ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {fileTypeOptions.map((option) => (
+                                        <CommandItem
+                                          key={option.value}
+                                          value={option.value}
+                                          onSelect={() => {
+                                            setPendingFileType(option.value === pendingFileType ? '' : option.value);
+                                          }}
+                                        >
+                                          {option.label}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Semester</Label>
+                            <Select value={pendingSemester} onValueChange={setPendingSemester}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Pilih semester" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {semesterOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button onClick={handleApplyFilter} className="flex-1">
+                              Terapkan
+                            </Button>
+                            <Button variant="outline" onClick={handleResetFilter} className="flex-1">
+                              Reset
+                            </Button>
+                          </div>
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {hasPermission('Modul', 'create') && (
+                      <Button onClick={() => setIsCreateOpen(true)} size="icon">
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </TableHead>
+            </TableRow>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-muted/50">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder
@@ -700,40 +802,46 @@ export default function Modul() {
               </TableRow>
             )}
           </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    {moduls.length} dari {pagination.total_items} data
+                  </div>
+                  <div className="space-x-2">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => table.previousPage()}
+                            className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => table.setPageIndex(page - 1)}
+                              isActive={table.getState().pagination.pageIndex === page - 1}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => table.nextPage()}
+                            className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
-      </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {moduls.length} dari {pagination.total_items} data
-        </div>
-        <div className="space-x-2">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => table.previousPage()}
-                  className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-              {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => table.setPageIndex(page - 1)}
-                    isActive={table.getState().pagination.pageIndex === page - 1}
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => table.nextPage()}
-                  className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
       </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -744,7 +852,7 @@ export default function Modul() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Upload modul (max 5 file, 50MB per file, format: DOCX, XLSX, PDF, PPTX)
+              File harus berformat DOCX, XLSX, PDF, atau PPTX
             </AlertDescription>
           </Alert>
           <Form {...createForm}>
@@ -788,10 +896,13 @@ export default function Modul() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Modul</DialogTitle>
-            <DialogDescription>
-              Edit nama atau upload file baru (max 50MB, format: DOCX, XLSX, PDF, PPTX)
-            </DialogDescription>
           </DialogHeader>
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              File harus berformat DOCX, XLSX, PDF, atau PPTX
+            </AlertDescription>
+          </Alert>
           <Form {...editForm}>
             <form onSubmit={handleEdit} className="space-y-4">
               <FormField
