@@ -1,158 +1,95 @@
-"use client";
-
 import { useState, useMemo, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
-  type ColumnDef,
-  flexRender,
-} from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
-import { EmptyState } from '@/components/common/EmptyState';
-import { formatDate } from '@/utils/format';
-import { useAppSelector } from '@/hooks/useAppSelector';
-import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { usePermissions } from '@/hooks/usePermissions';
-import {
-  fetchRoles,
-  fetchPermissions,
-  fetchRoleDetail,
-  createRole,
-  updateRole,
-  deleteRole,
-  clearError
-} from '@/lib/roleSlice';
-import type { RoleListItem, ResourcePermissions } from '@/types';
+import { useRole } from '@/hooks/useRole';
+import { RoleTable } from '@/features/role/RoleTable';
+import { RoleFormDialog } from '@/features/role/RoleFormDialog';
+import type { RoleListItem } from '@/types';
 
-interface RoleForm {
+interface RoleFormData {
   nama_role: string;
   permissions: Record<string, string[]>;
 }
 
 export default function Role() {
   const { hasPermission } = usePermissions();
+  const {
+    roles,
+    permissions,
+    loading,
+    error,
+    currentRole,
+    loadRoles,
+    loadPermissions,
+    loadRoleDetail,
+    createNewRole,
+    updateExistingRole,
+    deleteExistingRole,
+    clearError,
+    clearCurrentRole,
+  } = useRole();
+
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleListItem | null>(null);
   const [deletingRole, setDeletingRole] = useState<RoleListItem | null>(null);
-
-  const dispatch = useAppDispatch();
-  const { roles, permissions, loading, error, currentRole } = useAppSelector((state) => state.role);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    dispatch(fetchRoles());
-    dispatch(fetchPermissions());
-  }, [dispatch]);
+    loadRoles();
+    loadPermissions();
+  }, [loadRoles, loadPermissions]);
 
   useEffect(() => {
     if (error) {
       toast.error(error);
-      dispatch(clearError());
+      clearError();
     }
-  }, [error, dispatch]);
+  }, [error, clearError]);
 
-  const createForm = useForm<RoleForm>({
-    defaultValues: {
-      nama_role: '',
-      permissions: {},
-    },
-  });
+  const filteredRoles = useMemo(() => {
+    if (!search) return roles;
+    return roles.filter(role =>
+      role.nama_role.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search, roles]);
 
-  const editForm = useForm<RoleForm>({
-    defaultValues: {
-      nama_role: '',
-      permissions: {},
-    },
-  });
-
-  useEffect(() => {
-    if (currentRole && isEditOpen) {
-      editForm.setValue('nama_role', currentRole.nama_role);
-      const permissionsObj: Record<string, string[]> = {};
-      currentRole.permissions.forEach(perm => {
-        permissionsObj[perm.resource] = perm.actions;
-      });
-      editForm.setValue('permissions', permissionsObj);
-    }
-  }, [currentRole, isEditOpen, editForm]);
-
-  const handleCreate = createForm.handleSubmit(async (data) => {
-    try {
-      await dispatch(createRole(data)).unwrap();
+  const handleCreateSubmit = async (data: RoleFormData) => {
+    const result = await createNewRole(data);
+    if (result.success) {
       setIsCreateOpen(false);
-      createForm.reset();
       toast.success('Role berhasil ditambahkan');
-      dispatch(fetchRoles());
-    } catch {
-      // Error is handled by the slice
-    }
-  });
-
-  const handleEdit = editForm.handleSubmit(async (data) => {
-    if (editingRole) {
-      try {
-        await dispatch(updateRole({ id: editingRole.id, data })).unwrap();
-        setIsEditOpen(false);
-        setEditingRole(null);
-        editForm.reset();
-        toast.success('Role berhasil diperbarui');
-      } catch {
-        // Error is handled by the slice
-      }
-    }
-  });
-
-  const handleDelete = async () => {
-    if (deletingRole) {
-      try {
-        await dispatch(deleteRole(deletingRole.id)).unwrap();
-        setIsDeleteOpen(false);
-        setDeletingRole(null);
-        toast.success('Role berhasil dihapus');
-      } catch {
-        // Error is handled by the slice
-      }
     }
   };
 
-  const openEditDialog = (role: RoleListItem) => {
-    dispatch(fetchRoleDetail(role.id));
+  const handleEditSubmit = async (data: RoleFormData) => {
+    if (!editingRole) return;
+    
+    const result = await updateExistingRole(editingRole.id, data);
+    if (result.success) {
+      setIsEditOpen(false);
+      setEditingRole(null);
+      clearCurrentRole();
+      toast.success('Role berhasil diperbarui');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingRole) return;
+    
+    const result = await deleteExistingRole(deletingRole.id);
+    if (result.success) {
+      setIsDeleteOpen(false);
+      setDeletingRole(null);
+      toast.success('Role berhasil dihapus');
+    }
+  };
+
+  const openEditDialog = async (role: RoleListItem) => {
+    await loadRoleDetail(role.id);
     setEditingRole(role);
     setIsEditOpen(true);
   };
@@ -162,313 +99,72 @@ export default function Role() {
     setIsDeleteOpen(true);
   };
 
-  const columns: ColumnDef<RoleListItem>[] = [
-    {
-      accessorKey: 'nama_role',
-      header: 'Role',
-    },
-    {
-      accessorKey: 'jumlah_permission',
-      header: () => <div className="text-center">Permission</div>,
-      cell: ({ getValue }) => <div className="text-center">{getValue<number>()}</div>,
-    },
-    {
-      accessorKey: 'tanggal_diperbarui',
-      header: 'Tanggal Diperbarui',
-      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
-    },
-    {
-      id: 'actions',
-      header: () => <div className="text-center">Aksi</div>,
-      cell: ({ row }) => (
-        <div className="flex gap-2 justify-center">
-          {hasPermission('Role', 'update') && hasPermission('Permission', 'update') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openEditDialog(row.original)}
-              disabled={loading}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-          )}
-          {hasPermission('Role', 'delete') && hasPermission('Permission', 'delete') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openDeleteDialog(row.original)}
-              disabled={loading}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  const filteredData = useMemo(() => {
-    if (!search) return roles;
-    return roles.filter(role =>
-      role.nama_role.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search, roles]);
-
-  const table = useReactTable({
-    data: filteredData,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-  });
-
-  const PermissionCard = ({
-    resource,
-    form,
-  }: {
-    resource: ResourcePermissions;
-    form: ReturnType<typeof useForm<RoleForm>>;
-  }) => {
-    return (
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle className="text-lg">{resource.name}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {resource.permissions.map((perm) => (
-            <FormField
-              key={perm.action}
-              control={form.control}
-              name={`permissions.${resource.name}`}
-              render={({ field }) => {
-                const currentValues = field.value || [];
-                const isChecked = currentValues.includes(perm.action);
-
-                return (
-                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={isChecked}
-                        onCheckedChange={(checked) => {
-                          const newValues = checked
-                            ? [...currentValues, perm.action]
-                            : currentValues.filter((v: string) => v !== perm.action);
-                          field.onChange(newValues);
-                        }}
-                      />
-                    </FormControl>
-                    <Label className="text-sm font-normal">
-                      {perm.label}
-                    </Label>
-                  </FormItem>
-                );
-              }}
-            />
-          ))}
-        </CardContent>
-      </Card>
-    );
+  const handleCloseEditDialog = (open: boolean) => {
+    setIsEditOpen(open);
+    if (!open) {
+      setEditingRole(null);
+      clearCurrentRole();
+    }
   };
+
+  const handleCloseCreateDialog = (open: boolean) => {
+    setIsCreateOpen(open);
+  };
+
+  const canCreate = hasPermission('Role', 'create') && hasPermission('Permission', 'create');
+  const canEdit = hasPermission('Role', 'update') && hasPermission('Permission', 'update');
+  const canDelete = hasPermission('Role', 'delete') && hasPermission('Permission', 'delete');
+
+  const itemsPerPage = 10;
+  const paginatedRoles = filteredRoles.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(filteredRoles.length / itemsPerPage);
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex flex-row items-center gap-4 ml-auto md:hidden">
-        <div className="relative min-w-0 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Cari role..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        {hasPermission('Role', 'create') && hasPermission('Permission', 'create') && (
-          <Button onClick={() => setIsCreateOpen(true)} size="sm" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          </Button>
-        )}
-      </div>
+      <RoleTable
+        roles={paginatedRoles}
+        search={search}
+        onSearchChange={setSearch}
+        onCreateClick={() => setIsCreateOpen(true)}
+        onEditClick={openEditDialog}
+        onDeleteClick={openDeleteDialog}
+        loading={loading}
+        canCreate={canCreate}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filteredRoles.length}
+        onPageChange={setCurrentPage}
+        onPreviousPage={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+        onNextPage={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+        canPreviousPage={currentPage > 1}
+        canNextPage={currentPage < totalPages}
+      />
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead colSpan={columns.length}>
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <h3 className="text-base font-medium">Role & Permission</h3>
-                    <p className="text-xs text-muted-foreground">Buat dan kelola permission setiap role</p>
-                  </div>
-                  <div className="hidden md:flex items-center gap-4">
-                    <div className="relative min-w-0 max-w-sm">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Cari role..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                    {hasPermission('Role', 'create') && hasPermission('Permission', 'create') && (
-                      <Button onClick={() => setIsCreateOpen(true)} size="sm" disabled={loading}>
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </TableHead>
-            </TableRow>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-muted/50">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="p-0 border-0">
-                  <EmptyState
-                    title="Belum ada role"
-                    description="Belum ada role yang dibuat"
-                  />
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={columns.length} className="text-center">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    Menampilkan {table.getFilteredRowModel().rows.length} dari {roles.length} data
-                  </div>
-                  <div className="space-x-2">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            onClick={() => table.previousPage()}
-                            className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => table.setPageIndex(page - 1)}
-                              isActive={table.getState().pagination.pageIndex === page - 1}
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext
-                            onClick={() => table.nextPage()}
-                            className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </div>
-                </div>
-              </TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
-      </div>
+      <RoleFormDialog
+        open={isCreateOpen}
+        onOpenChange={handleCloseCreateDialog}
+        onSubmit={handleCreateSubmit}
+        permissions={permissions}
+        loading={loading}
+        title="Tambah Role"
+        submitLabel="Simpan"
+      />
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="!max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tambah Role</DialogTitle>
-          </DialogHeader>
-          <Form {...createForm}>
-            <form onSubmit={handleCreate} className="space-y-6">
-              <FormField
-                control={createForm.control}
-                name="nama_role"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label>Nama Role</Label>
-                    <FormControl>
-                      <Input placeholder="Masukkan nama role" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {permissions?.map((resource) => (
-                  <PermissionCard key={resource.name} resource={resource} form={createForm} />
-                ))}
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Simpan
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="!max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Role</DialogTitle>
-          </DialogHeader>
-          <Form {...editForm}>
-            <form onSubmit={handleEdit} className="space-y-6">
-              <FormField
-                control={editForm.control}
-                name="nama_role"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label>Nama Role</Label>
-                    <FormControl>
-                      <Input placeholder="Masukkan nama role" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {permissions?.map((resource) => (
-                  <PermissionCard key={resource.name} resource={resource} form={editForm} />
-                ))}
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Simpan
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <RoleFormDialog
+        open={isEditOpen}
+        onOpenChange={handleCloseEditDialog}
+        onSubmit={handleEditSubmit}
+        permissions={permissions}
+        loading={loading}
+        title="Edit Role"
+        submitLabel="Simpan"
+        currentRole={currentRole}
+      />
 
       <DeleteConfirmation
         open={isDeleteOpen}

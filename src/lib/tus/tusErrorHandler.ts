@@ -75,8 +75,8 @@ export class TUSErrorHandler {
         if (data.message) {
           message = data.message;
         }
-      } catch {
-        
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError);
       }
     }
 
