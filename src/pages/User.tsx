@@ -15,10 +15,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -40,6 +42,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
@@ -64,7 +67,7 @@ import { formatDate } from '@/utils/format';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { usePermissions } from '@/hooks/usePermissions';
-import { fetchUsers, updateUserRole, deleteUserAsync, fetchUserFiles, clearError } from '@/lib/userSlice';
+import { fetchUsers, updateUserRole, deleteUserAsync, fetchUserFiles, clearError, downloadUserFiles } from '@/lib/userSlice';
 import { fetchRoles } from '@/lib/roleSlice';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { UserItem, UserFile } from '@/types';
@@ -80,11 +83,11 @@ export default function User() {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<UserItem | null>(null);
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
   const [fileSearch, setFileSearch] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const dispatch = useAppDispatch();
   const users = useAppSelector((state) => state.user.users);
@@ -93,6 +96,7 @@ export default function User() {
   const roles = useAppSelector((state) => state.role.roles);
 
   const debouncedSearch = useDebounce(search, 500);
+  const canDownloadUserFiles = hasPermission('user', 'download');
 
   useEffect(() => {
     dispatch(fetchUsers({ limit: 1000 }));
@@ -120,13 +124,11 @@ export default function User() {
 
   const handleApplyFilter = filterForm.handleSubmit((data) => {
     setFilterRole(data.role);
-    setIsFilterOpen(false);
   });
 
   const handleResetFilter = () => {
     filterForm.reset();
     setFilterRole('');
-    setIsFilterOpen(false);
   };
 
   const handleEdit = editForm.handleSubmit(async (data) => {
@@ -139,7 +141,7 @@ export default function User() {
         editForm.reset();
         toast.success('User berhasil diperbarui');
       } catch {
-        // Error is handled in slice
+        toast.error('Gagal memperbarui user');
       }
     }
   });
@@ -152,7 +154,7 @@ export default function User() {
         setDeletingUser(null);
         toast.success('User berhasil dihapus');
       } catch {
-        // Error is handled in slice
+        toast.error('Gagal menghapus user');
       }
     }
   };
@@ -160,10 +162,11 @@ export default function User() {
   const openViewDialog = async (user: UserItem) => {
     setViewingUser(user);
     setFileSearch('');
+    setSelectedFiles(new Set());
     try {
       await dispatch(fetchUserFiles({ id: parseInt(user.id), limit: 1000 })).unwrap();
     } catch {
-      // Error handled in slice
+      toast.error('Gagal memuat file user');
     }
     setIsViewOpen(true);
   };
@@ -179,8 +182,90 @@ export default function User() {
     setIsDeleteOpen(true);
   };
 
-  const handleDownload = (fileName: string) => {
-    toast.success(`File ${fileName} berhasil didownload`);
+  const getFileKey = (file: UserFile) => `${file.kategori.toLowerCase()}:${file.id}`;
+
+  const partitionFilesByCategory = (files: UserFile[]) => {
+    const projectIds: number[] = [];
+    const modulIds: number[] = [];
+
+    files.forEach((file) => {
+      const category = file.kategori.toLowerCase();
+      if (category === 'project') {
+        projectIds.push(file.id);
+      } else if (category === 'modul') {
+        modulIds.push(file.id);
+      }
+    });
+
+    return { projectIds, modulIds };
+  };
+
+  const downloadFiles = async (files: UserFile[], successMessage: string): Promise<boolean> => {
+    if (!viewingUser || !canDownloadUserFiles) return false;
+
+    const { projectIds, modulIds } = partitionFilesByCategory(files);
+
+    if (projectIds.length === 0 && modulIds.length === 0) {
+      toast.error('Tidak ada file yang dapat didownload');
+      return false;
+    }
+
+    try {
+      await dispatch(downloadUserFiles({
+        userId: parseInt(viewingUser.id),
+        projectIds,
+        modulIds,
+      })).unwrap();
+      toast.success(successMessage);
+      return true;
+    } catch {
+      toast.error('Gagal mendownload file');
+      return false;
+    }
+  };
+
+  const handleDownload = (file: UserFile) => {
+    void downloadFiles([file], `File ${file.nama_file} berhasil didownload`);
+  };
+
+  const handleFileSelect = (file: UserFile, checked: boolean) => {
+    const key = getFileKey(file);
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedFiles(new Set(filteredFiles.map((file) => getFileKey(file))));
+    } else {
+      setSelectedFiles(new Set());
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    if (selectedFileCount === 0) return;
+
+    const filesToDownload = Array.from(selectedFiles)
+      .map((key) => fileLookup.get(key))
+      .filter((file): file is UserFile => Boolean(file));
+    
+    if (filesToDownload.length === 0) return;
+    
+    const success = await downloadFiles(
+      filesToDownload, 
+      `${filesToDownload.length} file berhasil didownload`
+    );
+    
+    if (success) {
+      setSelectedFiles(new Set());
+    }
   };
 
   const filteredUsers = useMemo(() => {
@@ -208,6 +293,18 @@ export default function User() {
       file.kategori.toLowerCase().includes(debouncedFileSearch.toLowerCase())
     );
   }, [userFiles, debouncedFileSearch]);
+
+  const fileLookup = useMemo(() => {
+    const map = new Map<string, UserFile>();
+    userFiles.forEach((file) => {
+      map.set(getFileKey(file), file);
+    });
+    return map;
+  }, [userFiles]);
+
+  const selectedFileCount = selectedFiles.size;
+  const isAllSelected = filteredFiles.length > 0 && filteredFiles.every((file) => selectedFiles.has(getFileKey(file)));
+  const headerCheckboxState: boolean | 'indeterminate' = isAllSelected ? true : selectedFileCount > 0 ? 'indeterminate' : false;
 
   const userColumns: ColumnDef<UserItem>[] = [
     {
@@ -259,6 +356,21 @@ export default function User() {
   ];
 
   const fileColumns: ColumnDef<UserFile>[] = [
+    ...(canDownloadUserFiles ? [{
+      id: 'select',
+      header: () => (
+        <Checkbox
+          checked={headerCheckboxState}
+          onCheckedChange={handleSelectAll}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={selectedFiles.has(getFileKey(row.original))}
+          onCheckedChange={(checked) => handleFileSelect(row.original, checked === true)}
+        />
+      ),
+    } as ColumnDef<UserFile>] : []),
     {
       accessorKey: 'nama_file',
       header: 'Nama File',
@@ -267,19 +379,19 @@ export default function User() {
       accessorKey: 'kategori',
       header: 'Kategori',
     },
-    {
+    ...(canDownloadUserFiles ? [{
       id: 'actions',
       header: 'Aksi',
       cell: ({ row }) => (
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => handleDownload(row.original.nama_file)}
+          onClick={() => handleDownload(row.original)}
         >
           <Download className="h-4 w-4" />
         </Button>
       ),
-    },
+    } as ColumnDef<UserFile>] : []),
   ];
 
   const userTable = useReactTable({
@@ -299,7 +411,7 @@ export default function User() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col lg:hidden sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-row items-center gap-4 ml-auto">
           <div className="relative min-w-0 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -310,7 +422,7 @@ export default function User() {
               className="pl-9"
             />
           </div>
-          <DropdownMenu open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <Filter className="h-4 w-4" />
@@ -392,8 +504,105 @@ export default function User() {
       <div className="rounded-md border">
         <Table>
           <TableHeader>
+            <TableRow>
+              <TableHead colSpan={userColumns.length} className="text-left py-2">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <h2 className="text-lg font-semibold">User</h2>
+                    <p className="text-xs text-muted-foreground">Kelola data pengguna</p>
+                  </div>
+                  <div className="lg:flex hidden flex-row items-center gap-4">
+                    <div className="relative min-w-0 max-w-sm">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Cari user..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Filter className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-80 p-4">
+                        <Form {...filterForm}>
+                          <form onSubmit={handleApplyFilter} className="space-y-4">
+                            <FormField
+                              control={filterForm.control}
+                              name="role"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <Label>Role</Label>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className={cn(
+                                            "w-full justify-between",
+                                            !field.value && "text-muted-foreground"
+                                          )}
+                                        >
+                                          {field.value || "Pilih role"}
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-full p-0">
+                                      <Command>
+                                        <CommandInput placeholder="Cari role..." />
+                                <CommandList>
+                                  <CommandEmpty>Role tidak ditemukan.</CommandEmpty>
+                                  <CommandGroup>
+                                    {roles.map((role) => (
+                                      <CommandItem
+                                        key={role.id}
+                                        value={role.nama_role}
+                                        onSelect={() => {
+                                          filterForm.setValue("role", role.nama_role);
+                                        }}
+                                      >
+                                        {role.nama_role}
+                                        <Check
+                                          className={cn(
+                                            "ml-auto",
+                                            role.nama_role === field.value
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </FormItem>
+                      )}
+                      />
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1">
+                          Terapkan
+                        </Button>
+                        <Button type="button" variant="outline" onClick={handleResetFilter} className="flex-1">
+                          Reset
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DropdownMenuContent>
+              </DropdownMenu>
+                  </div>
+                </div>
+              </TableHead>
+            </TableRow>
             {userTable.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-muted/50">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder
@@ -426,41 +635,46 @@ export default function User() {
               </TableRow>
             )}
           </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell colSpan={userColumns.length} className="text-left py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 text-sm text-muted-foreground">
+                    Menampilkan {userTable.getFilteredRowModel().rows.length} dari {users.length} data
+                  </div>
+                  <div className="space-x-2">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => userTable.previousPage()}
+                            className={userTable.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: userTable.getPageCount() }, (_, i) => i + 1).map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => userTable.setPageIndex(page - 1)}
+                              isActive={userTable.getState().pagination.pageIndex === page - 1}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => userTable.nextPage()}
+                            className={userTable.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
-      </div>
-
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          Menampilkan {userTable.getFilteredRowModel().rows.length} dari {users.length} data
-        </div>
-        <div className="space-x-2">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => userTable.previousPage()}
-                  className={userTable.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-              {Array.from({ length: userTable.getPageCount() }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => userTable.setPageIndex(page - 1)}
-                    isActive={userTable.getState().pagination.pageIndex === page - 1}
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => userTable.nextPage()}
-                  className={userTable.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
       </div>
 
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
@@ -479,21 +693,40 @@ export default function User() {
                 <p className="text-sm text-muted-foreground">{viewingUser.role.name}</p>
               </div>
               <div>
-                <Label>Files</Label>
                 <div className="mt-2">
-                  <div className="relative mb-4">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Cari file..."
-                      value={fileSearch}
-                      onChange={(e) => setFileSearch(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
                   <div className="max-h-96 overflow-y-auto">
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
+                          <TableRow>
+                            <TableHead colSpan={fileColumns.length} className="text-left py-2">
+                              <div className="flex items-center justify-between">
+                                {selectedFileCount > 0 && canDownloadUserFiles && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" aria-label="Download semua">
+                                        <Download className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={handleBulkDownload}>
+                                        Download semua
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                                <div className="relative max-w-sm ml-auto">
+                                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                  <Input
+                                    placeholder="Cari file..."
+                                    value={fileSearch}
+                                    onChange={(e) => setFileSearch(e.target.value)}
+                                    className="pl-9"
+                                  />
+                                </div>
+                              </div>
+                            </TableHead>
+                          </TableRow>
                           {fileTable.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                               {headerGroup.headers.map((header) => (

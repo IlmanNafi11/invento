@@ -90,6 +90,27 @@ export const fetchUserFiles = createAsyncThunk<
   }
 });
 
+export const downloadUserFiles = createAsyncThunk<
+  void,
+  { userId: number; projectIds: number[]; modulIds: number[] },
+  { rejectValue: string }
+>('user/downloadUserFiles', async ({ userId, projectIds, modulIds }, { rejectWithValue }) => {
+  try {
+    const { blob, filename } = await userAPI.downloadUserFiles(userId, projectIds, modulIds);
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(anchor);
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: number };
+    return rejectWithValue(err.message || 'Failed to download user files');
+  }
+});
+
 const userSlice = createSlice({
   name: 'user',
   initialState,
@@ -169,6 +190,17 @@ const userSlice = createSlice({
       .addCase(fetchUserFiles.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Failed to fetch user files';
+      })
+      .addCase(downloadUserFiles.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(downloadUserFiles.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(downloadUserFiles.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Failed to download user files';
       });
   },
 });
