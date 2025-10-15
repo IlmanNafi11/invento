@@ -123,6 +123,7 @@ export default function Modul() {
   const [moduls, setModuls] = useState<ModulListItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total_items: 0, total_pages: 0 });
   const [filterOpen, setFilterOpen] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -549,7 +550,7 @@ export default function Modul() {
             className="pl-9"
           />
         </div>
-        <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
+        <DropdownMenu open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" className="relative">
               <Filter className="h-4 w-4" />
@@ -615,10 +616,10 @@ export default function Modul() {
                 </Select>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleApplyFilter} className="flex-1">
+                <Button onClick={() => { handleApplyFilter(); setMobileFilterOpen(false); }} className="flex-1">
                   Terapkan
                 </Button>
-                <Button variant="outline" onClick={handleResetFilter} className="flex-1">
+                <Button variant="outline" onClick={() => { handleResetFilter(); setMobileFilterOpen(false); }} className="flex-1">
                   Reset
                 </Button>
               </div>
