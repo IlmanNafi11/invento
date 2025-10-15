@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { authAPI } from './auth';
 import { clearProfile, fetchProfile } from './profileSlice';
+import { handleAPIError } from './apiUtils';
 import type { User, AuthRequest, RegisterRequest, AuthSuccessResponse } from '@/types';
 
 interface AuthState {
@@ -50,16 +51,14 @@ export const login = createAsyncThunk<
     dispatch(fetchProfile());
 
     return response;
-  } catch (error: unknown) {
-    const err = error as { code?: number; message?: string; errors?: { message: string }[] };
-    if (err.code === 401) {
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    
+    if (errorInfo.isUnauthorized) {
       return rejectWithValue('Email atau password salah');
     }
-    if (err.code === 400 && err.errors) {
-      const validationErrors = err.errors.map((e) => e.message).join(', ');
-      return rejectWithValue(validationErrors);
-    }
-    return rejectWithValue(err.message || 'Terjadi kesalahan saat login');
+    
+    return rejectWithValue(errorInfo.message);
   }
 });
 
@@ -71,7 +70,6 @@ export const register = createAsyncThunk<
   try {
     const response = await authAPI.register(userData);
 
-    // Store tokens immediately so fetchProfile can use them
     localStorage.setItem('access_token', response.data.access_token);
     localStorage.setItem('refresh_token', response.data.refresh_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -79,16 +77,14 @@ export const register = createAsyncThunk<
     dispatch(fetchProfile());
 
     return response;
-  } catch (error: unknown) {
-    const err = error as { code?: number; message?: string; errors?: { message: string }[] };
-    if (err.code === 409) {
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    
+    if (errorInfo.isConflict) {
       return rejectWithValue('Email sudah terdaftar');
     }
-    if (err.code === 400 && err.errors) {
-      const validationErrors = err.errors.map((e) => e.message).join(', ');
-      return rejectWithValue(validationErrors);
-    }
-    return rejectWithValue(err.message || 'Terjadi kesalahan saat registrasi');
+    
+    return rejectWithValue(errorInfo.message);
   }
 });
 

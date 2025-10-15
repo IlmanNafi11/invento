@@ -1,63 +1,30 @@
+import { APIClient } from './apiUtils';
 import type {
   AuthRequest,
   RegisterRequest,
   AuthSuccessResponse,
   SuccessResponse,
-  ErrorResponse,
-  ValidationErrorResponse,
 } from '@/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
-
-class AuthAPI {
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
-
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw data as ErrorResponse | ValidationErrorResponse;
-    }
-
-    return data as T;
-  }
-
+class AuthAPIClient extends APIClient {
   async login(credentials: AuthRequest): Promise<AuthSuccessResponse> {
-    return this.request<AuthSuccessResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
+    return this.post<AuthSuccessResponse>('/auth/login', credentials, { skipAuth: true });
   }
 
   async register(userData: RegisterRequest): Promise<AuthSuccessResponse> {
-    return this.request<AuthSuccessResponse>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
+    return this.post<AuthSuccessResponse>('/auth/register', userData, { skipAuth: true });
   }
 
   async logout(): Promise<SuccessResponse> {
-    const token = localStorage.getItem('access_token');
-    const refreshToken = localStorage.getItem('refresh_token');
-    return this.request<SuccessResponse>('/auth/logout', {
-      method: 'POST',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(refreshToken ? { 'X-Refresh-Token': refreshToken } : {}),
-      },
+    const refreshToken = this.getRefreshToken();
+    return this.post<SuccessResponse>('/auth/logout', undefined, {
+      customHeaders: refreshToken ? { 'X-Refresh-Token': refreshToken } : {},
     });
+  }
+
+  async refreshToken(refreshToken: string): Promise<AuthSuccessResponse> {
+    return this.post<AuthSuccessResponse>('/auth/refresh', { refresh_token: refreshToken }, { skipAuth: true });
   }
 }
 
-export const authAPI = new AuthAPI();
+export const authAPI = new AuthAPIClient();

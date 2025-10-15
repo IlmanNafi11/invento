@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,8 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { register as registerThunk, clearError } from "@/lib/authSlice";
-import { useAppDispatch, useAppSelector } from "@/hooks/useAppDispatch";
+import { useAuth } from "@/hooks/useAuth";
+import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { WaveBackground } from "@/components/common/WaveBackground";
 
 const registerSchema = z
@@ -37,9 +36,8 @@ const registerSchema = z
 type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function Register() {
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const { loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { register: registerUser, loading, error, clearError } = useAuth();
+  useAuthRedirect();
 
   const {
     register,
@@ -54,25 +52,14 @@ export default function Register() {
   const passwordField = register("password");
   const confirmPasswordField = register("confirmPassword");
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
-
   const onSubmit = async (data: RegisterForm) => {
-    try {
-      const registerData = { name: data.name, email: data.email, password: data.password };
-      await dispatch(registerThunk(registerData)).unwrap();
-      navigate("/dashboard", { replace: true });
-    } catch {
-      // Error is handled by the slice
-    }
+    const registerData = { name: data.name, email: data.email, password: data.password };
+    await registerUser(registerData);
   };
 
   const handleInputChange = () => {
     if (error) {
-      dispatch(clearError());
+      clearError();
     }
   };
 
