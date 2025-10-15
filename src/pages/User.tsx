@@ -59,6 +59,7 @@ import {
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
+import { EmptyState } from '@/components/common/EmptyState';
 import { formatDate } from '@/utils/format';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
@@ -224,9 +225,9 @@ export default function User() {
     },
     {
       id: 'actions',
-      header: 'Aksi',
+      header: () => <div className="text-center">Aksi</div>,
       cell: ({ row }) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 justify-center">
           <Button
             variant="ghost"
             size="sm"
@@ -299,8 +300,7 @@ export default function User() {
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold">User</h1>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 ml-auto">
+        <div className="flex flex-row items-center gap-4 ml-auto">
           <div className="relative min-w-0 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -312,9 +312,8 @@ export default function User() {
           </div>
           <DropdownMenu open={isFilterOpen} onOpenChange={setIsFilterOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="shrink-0">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-80 p-4">
@@ -418,8 +417,11 @@ export default function User() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={userColumns.length} className="h-24 text-center">
-                  Tidak ada data.
+                <TableCell colSpan={userColumns.length} className="p-0 border-0">
+                  <EmptyState
+                    title="Belum ada user"
+                    description="Belum ada user yang terdaftar"
+                  />
                 </TableCell>
               </TableRow>
             )}
@@ -429,8 +431,7 @@ export default function User() {
 
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {userTable.getFilteredSelectedRowModel().rows.length} dari{' '}
-          {userTable.getFilteredRowModel().rows.length} baris dipilih.
+          Menampilkan {userTable.getFilteredRowModel().rows.length} dari {users.length} data
         </div>
         <div className="space-x-2">
           <Pagination>

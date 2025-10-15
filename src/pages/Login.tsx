@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { login, clearError } from "@/lib/authSlice";
 import { useAppDispatch, useAppSelector } from "@/hooks/useAppDispatch";
 import { usePermissions } from "@/hooks/usePermissions";
+import { WaveBackground } from "@/components/common/WaveBackground";
 
 const loginSchema = z.object({
   email: z.string().email("Format email tidak valid"),
@@ -38,6 +39,9 @@ export default function Login() {
     resolver: zodResolver(loginSchema),
   });
 
+  const emailField = register("email");
+  const passwordField = register("password");
+
   const from = location.state?.from?.pathname || "/dashboard";
 
   useEffect(() => {
@@ -58,63 +62,84 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Login</CardTitle>
-          <CardDescription>Masuk ke Invento</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                {...register("email")}
-                onChange={(e) => {
-                  register("email").onChange(e);
-                  handleInputChange();
-                }}
-              />
-              {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#060509] px-6 py-12">
+      <WaveBackground />
+      <div className="relative z-10 w-full max-w-md">
+        <Card className="w-full border-white/10 bg-white/5 text-white shadow-[0_30px_90px_rgba(148,77,255,0.18)] backdrop-blur-lg supports-[backdrop-filter]:backdrop-blur-lg">
+          <CardHeader className="space-y-2">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/70">
+              Invento
             </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                {...register("password")}
-                onChange={(e) => {
-                  register("password").onChange(e);
-                  handleInputChange();
-                }}
-              />
-              {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
+            <CardTitle className="text-3xl font-semibold text-white">Welcome back!</CardTitle>
+            <CardDescription className="text-sm text-white/70">
+              masukan akun anda untuk masuk ke Invento
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {error && (
+              <Alert variant="destructive" className="border-red-500/40 bg-red-500/15 text-red-200">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-white">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="anda@polije.ac.id"
+                  {...emailField}
+                  onChange={(event) => {
+                    emailField.onChange(event);
+                    handleInputChange();
+                  }}
+                  className="border-white/10 bg-white/10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
+                />
+                {errors.email && <p className="text-sm text-red-300">{errors.email.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-white">
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  {...passwordField}
+                  onChange={(event) => {
+                    passwordField.onChange(event);
+                    handleInputChange();
+                  }}
+                  className="border-white/10 bg-white/10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
+                />
+                {errors.password && <p className="text-sm text-red-300">{errors.password.message}</p>}
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-white text-gray-900 hover:bg-white/90"
+                disabled={loading || isRedirecting}
+              >
+                {loading || isRedirecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isRedirecting ? "Memuat hak akses..." : "Sedang masuk..."}
+                  </>
+                ) : (
+                  "Masuk"
+                )}
+              </Button>
+            </form>
+            <div className="text-center text-sm text-white/70">
+              Belum memiliki akun?{" "}
+              <Link to="/register" className="font-medium text-white hover:text-white/80">
+                Daftar sekarang
+              </Link>
             </div>
-            <Button type="submit" className="w-full" disabled={loading || isRedirecting}>
-              {loading || isRedirecting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isRedirecting ? "Loading permissions..." : "Loading..."}
-                </>
-              ) : (
-                "Login"
-              )}
-            </Button>
-          </form>
-          <div className="mt-4 text-center">
-            <p className="text-sm">
-              Belum memiliki akun? <Link to="/register" className="text-primary hover:underline">Register</Link>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

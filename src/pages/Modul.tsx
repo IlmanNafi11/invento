@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Upload, Search, Filter, Edit, Trash2, Download, Loader2 } from 'lucide-react';
+import { Upload, Search, Filter, Edit, Trash2, Download, Loader2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useReactTable,
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,6 +67,7 @@ import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { Progress } from '@/components/ui/progress';
 import { FileInput } from '@/components/common/FileInput';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
+import { EmptyState } from '@/components/common/EmptyState';
 import { formatDate } from '@/utils/format';
 import { useDebounce } from '@/hooks/useDebounce';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -111,6 +113,12 @@ interface FileUploadState {
 
 export default function Modul() {
   const { hasPermission } = usePermissions();
+
+  useEffect(() => {
+    const handleOpenUpload = () => setIsCreateOpen(true);
+    window.addEventListener('open-modul-upload', handleOpenUpload);
+    return () => window.removeEventListener('open-modul-upload', handleOpenUpload);
+  }, []);
   const [search, setSearch] = useState('');
   const [moduls, setModuls] = useState<ModulListItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total_items: 0, total_pages: 0 });
@@ -531,101 +539,97 @@ export default function Modul() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Modul</h1>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="relative min-w-0 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Cari modul..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="relative">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-                {(fileType && fileType !== 'all' || semester && semester !== 'all') && (
-                  <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    {[fileType !== 'all' ? fileType : null, semester !== 'all' ? semester : null].filter(Boolean).length}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80">
-              <div className="p-4 space-y-4">
-                <div className="space-y-2">
-                  <Label>Tipe File</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {pendingFileType
-                          ? fileTypeOptions.find(option => option.value === pendingFileType)?.label
-                          : "Pilih tipe file"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Cari tipe file..." />
-                        <CommandList>
-                          <CommandEmpty>Tidak ada tipe file ditemukan.</CommandEmpty>
-                          <CommandGroup>
-                            {fileTypeOptions.map((option) => (
-                              <CommandItem
-                                key={option.value}
-                                value={option.value}
-                                onSelect={() => {
-                                  setPendingFileType(option.value === pendingFileType ? '' : option.value);
-                                }}
-                              >
-                                {option.label}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label>Semester</Label>
-                  <Select value={pendingSemester} onValueChange={setPendingSemester}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih semester" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {semesterOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleApplyFilter} className="flex-1">
-                    Terapkan
-                  </Button>
-                  <Button variant="outline" onClick={handleResetFilter} className="flex-1">
-                    Reset
-                  </Button>
-                </div>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {hasPermission('Modul', 'create') && (
-            <Button onClick={() => setIsCreateOpen(true)} size="icon">
-              <Upload className="h-4 w-4" />
-            </Button>
-          )}
+      <div className="flex items-center justify-end gap-4">
+        <div className="relative flex-1 min-w-0 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Cari modul..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
+        <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="relative">
+              <Filter className="h-4 w-4" />
+              {(fileType && fileType !== 'all' || semester && semester !== 'all') && (
+                <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                  {[fileType !== 'all' ? fileType : null, semester !== 'all' ? semester : null].filter(Boolean).length}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-80">
+            <div className="p-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Tipe File</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {pendingFileType
+                        ? fileTypeOptions.find(option => option.value === pendingFileType)?.label
+                        : "Pilih tipe file"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Cari tipe file..." />
+                      <CommandList>
+                        <CommandEmpty>Tidak ada tipe file ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          {fileTypeOptions.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={option.value}
+                              onSelect={() => {
+                                setPendingFileType(option.value === pendingFileType ? '' : option.value);
+                              }}
+                            >
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Semester</Label>
+                <Select value={pendingSemester} onValueChange={setPendingSemester}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {semesterOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleApplyFilter} className="flex-1">
+                  Terapkan
+                </Button>
+                <Button variant="outline" onClick={handleResetFilter} className="flex-1">
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {hasPermission('Modul', 'create') && (
+          <Button onClick={() => setIsCreateOpen(true)} size="icon">
+            <Upload className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {uploadStates.length > 0 && (
@@ -659,7 +663,7 @@ export default function Modul() {
         </div>
       )}
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-auto max-h-96">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -687,8 +691,11 @@ export default function Modul() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  Tidak ada data.
+                <TableCell colSpan={columns.length} className="p-0 border-0">
+                  <EmptyState
+                    title="Belum ada modul"
+                    description="Silahkan upload modul pertama anda"
+                  />
                 </TableCell>
               </TableRow>
             )}
@@ -697,8 +704,7 @@ export default function Modul() {
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} dari{' '}
-          {table.getFilteredRowModel().rows.length} baris dipilih.
+          {moduls.length} dari {pagination.total_items} data
         </div>
         <div className="space-x-2">
           <Pagination>
@@ -734,10 +740,13 @@ export default function Modul() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Upload Modul</DialogTitle>
-            <DialogDescription>
-              Upload modul (max 5 file, 50MB per file, format: DOCX, XLSX, PDF, PPTX)
-            </DialogDescription>
           </DialogHeader>
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Upload modul (max 5 file, 50MB per file, format: DOCX, XLSX, PDF, PPTX)
+            </AlertDescription>
+          </Alert>
           <Form {...createForm}>
             <form onSubmit={handleCreate} className="space-y-4">
               <FormField

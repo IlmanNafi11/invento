@@ -33,6 +33,7 @@ import {
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { setSidebarOpen } from "@/lib/sidebarSlice";
 import { logout } from "@/lib/authSlice";
 import { fetchProfile } from "@/lib/profileSlice";
@@ -47,6 +48,7 @@ export default function Layout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
+  const isMobile = useIsMobile();
   const [profileOpen, setProfileOpen] = useState(false);
   const [shouldNavigateToLogin, setShouldNavigateToLogin] = useState(false);
 
@@ -89,7 +91,7 @@ export default function Layout() {
   const sidebarContent = (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center justify-between px-2">
+        <div className="flex items-center justify-between px-2 group-data-[collapsible=icon]:justify-center">
           <h2 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">Invento</h2>
           <SidebarTrigger />
         </div>
@@ -171,7 +173,7 @@ export default function Layout() {
       <SidebarFooter>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <div className="flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent cursor-pointer">
+          <div className="flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent cursor-pointer group-data-[collapsible=icon]:justify-center">
             <Avatar className="h-8 w-8">
               <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
               <AvatarFallback>{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
@@ -209,8 +211,11 @@ export default function Layout() {
   );
 
   const headerContent = (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6">
-      <div className="ml-auto flex items-center gap-2">
+    <header className={`flex h-16 shrink-0 items-center border-b px-4 md:px-6 ${isMobile ? 'justify-between' : ''}`}>
+      {isMobile && (
+        <SidebarTrigger />
+      )}
+      <div className={`flex items-center gap-2 ${isMobile ? '' : 'ml-auto'}`}>
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

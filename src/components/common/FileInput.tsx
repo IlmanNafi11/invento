@@ -31,7 +31,7 @@ interface FileInputProps {
 }
 
 const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
-  ({ id, label = 'Pilih file', accept, multiple = true, layout = 'card', onChange, value = [], categoryOptions, editableName = true, showCategory = true, showSemester = true, namePlaceholder = 'Nama file', nameLabel = 'Nama Project', addButtonLabel = 'Tambah Project Lain', fileLabel = 'File Project' }, ref) => {
+  ({ id, label = 'Pilih file', accept, multiple = true, layout = 'card', onChange, value = [], categoryOptions, editableName = true, showCategory = true, showSemester = true, namePlaceholder = 'Nama file', nameLabel = 'Nama Modul', addButtonLabel = 'Tambah Modul Lain', fileLabel = 'File Modul' }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
@@ -156,7 +156,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
               <div key={index} className="space-y-4 p-4 border rounded-lg">
                 {multiple && value.length > 1 && (
                   <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-medium">Project {index + 1}</h4>
+                    <h4 className="text-sm font-medium">Modul {index + 1}</h4>
                     {value.length > 1 && (
                       <Button
                         type="button"
@@ -269,7 +269,7 @@ const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
                 </div>
               </div>
             ))}
-            {multiple && (
+            {multiple && value.length < 5 && (
               <Button
                 type="button"
                 variant="outline"

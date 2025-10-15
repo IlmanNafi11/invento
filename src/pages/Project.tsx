@@ -66,6 +66,7 @@ import {
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
+import { EmptyState } from '@/components/common/EmptyState';
 import { formatDate } from '@/utils/format';
 import { useDebounce } from '@/hooks/useDebounce';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -172,30 +173,48 @@ export default function Project() {
   const columns: ColumnDef<ProjectListItem>[] = [
     {
       accessorKey: 'nama_project',
-      header: 'Nama Project',
+      header: () => (
+        <div className="text-left">Nama Project</div>
+      ),
+      cell: ({ getValue }) => (
+        <div className="text-left">{getValue<string>()}</div>
+      ),
     },
     {
       accessorKey: 'kategori',
-      header: 'Kategori',
+      header: () => (
+        <div className="text-left">Kategori</div>
+      ),
       cell: ({ getValue }) => {
         const cat = getValue<ProjectCategory>();
-        return categoryOptions.find(c => c.value === cat)?.label || cat;
+        return <div className="text-left">{categoryOptions.find(c => c.value === cat)?.label || cat}</div>;
       },
     },
     {
       accessorKey: 'ukuran',
-      header: 'Ukuran',
+      header: () => (
+        <div className="text-center">Ukuran</div>
+      ),
+      cell: ({ getValue }) => (
+        <div className="text-center">{getValue<string>()}</div>
+      ),
     },
     {
       accessorKey: 'terakhir_diperbarui',
-      header: 'Tanggal Diperbarui',
-      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
+      header: () => (
+        <div className="text-center">Tanggal Diperbarui</div>
+      ),
+      cell: ({ getValue }) => (
+        <div className="text-center">{formatDate(new Date(getValue<string>()))}</div>
+      ),
     },
     {
       id: 'actions',
-      header: 'Aksi',
+      header: () => (
+        <div className="text-center">Aksi</div>
+      ),
       cell: ({ row }) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -541,9 +560,8 @@ export default function Project() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Project</h1>
-        <div className="flex flex-wrap items-center gap-4">
+      <div className="flex items-center justify-end">
+        <div className="flex items-center gap-4">
           <div className="relative min-w-0 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -556,8 +574,7 @@ export default function Project() {
           <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="relative">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
+                <Filter className="h-4 w-4" />
                 {(semester || category) && (
                   <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
                     {(semester ? 1 : 0) + (category ? 1 : 0)}
@@ -718,8 +735,11 @@ export default function Project() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  Tidak ada data.
+                <TableCell colSpan={columns.length} className="p-0 border-0">
+                  <EmptyState
+                    title="Belum ada project"
+                    description="Silahkan upload project pertama anda"
+                  />
                 </TableCell>
               </TableRow>
             )}
@@ -728,8 +748,7 @@ export default function Project() {
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} dari{' '}
-          {table.getFilteredRowModel().rows.length} baris dipilih.
+          Menampilkan {table.getFilteredRowModel().rows.length} dari {pagination.total_items} data
         </div>
         <div className="space-x-2">
           <Pagination>

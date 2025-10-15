@@ -41,6 +41,7 @@ import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
+import { EmptyState } from '@/components/common/EmptyState';
 import { formatDate } from '@/utils/format';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
@@ -167,7 +168,8 @@ export default function Role() {
     },
     {
       accessorKey: 'jumlah_permission',
-      header: 'Jumlah Permission',
+      header: () => <div className="text-center">Permission</div>,
+      cell: ({ getValue }) => <div className="text-center">{getValue<number>()}</div>,
     },
     {
       accessorKey: 'tanggal_diperbarui',
@@ -176,9 +178,9 @@ export default function Role() {
     },
     {
       id: 'actions',
-      header: 'Aksi',
+      header: () => <div className="text-center">Aksi</div>,
       cell: ({ row }) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 justify-center">
           {hasPermission('Role', 'update') && hasPermission('Permission', 'update') && (
             <Button
               variant="ghost"
@@ -270,8 +272,7 @@ export default function Role() {
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold">Role & Permission</h1>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+        <div className="flex flex-row items-center gap-4 ml-auto">
           <div className="relative min-w-0 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -282,9 +283,8 @@ export default function Role() {
             />
           </div>
           {hasPermission('Role', 'create') && hasPermission('Permission', 'create') && (
-            <Button onClick={() => setIsCreateOpen(true)} className="shrink-0" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-              Tambah Role
+            <Button onClick={() => setIsCreateOpen(true)} size="sm" disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             </Button>
           )}
         </div>
@@ -318,8 +318,11 @@ export default function Role() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  Tidak ada data.
+                <TableCell colSpan={columns.length} className="p-0 border-0">
+                  <EmptyState
+                    title="Belum ada role"
+                    description="Belum ada role yang dibuat"
+                  />
                 </TableCell>
               </TableRow>
             )}
@@ -329,8 +332,7 @@ export default function Role() {
 
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} dari{' '}
-          {table.getFilteredRowModel().rows.length} baris dipilih.
+          Menampilkan {table.getFilteredRowModel().rows.length} dari {roles.length} data
         </div>
         <div className="space-x-2">
           <Pagination>
