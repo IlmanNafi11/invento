@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { userAPI } from './userAPI';
+import { handleAPIError } from './apiUtils';
 import type { UserItem, UserListItem, UserFile, UpdateUserRoleRequest } from '@/types';
 
 interface UserState {
@@ -43,9 +44,9 @@ export const fetchUsers = createAsyncThunk<
   try {
     const response = await userAPI.getUsers(params);
     return response.data.items;
-  } catch (error: unknown) {
-    const err = error as { message?: string; code?: number };
-    return rejectWithValue(err.message || 'Failed to fetch users');
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    return rejectWithValue(errorInfo.message);
   }
 });
 
@@ -56,9 +57,9 @@ export const updateUserRole = createAsyncThunk<
 >('user/updateUserRole', async ({ id, role }, { rejectWithValue }) => {
   try {
     await userAPI.updateUserRole(id, role);
-  } catch (error: unknown) {
-    const err = error as { message?: string; code?: number };
-    return rejectWithValue(err.message || 'Failed to update user role');
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    return rejectWithValue(errorInfo.message);
   }
 });
 
@@ -70,9 +71,9 @@ export const deleteUserAsync = createAsyncThunk<
   try {
     await userAPI.deleteUser(id);
     return id;
-  } catch (error: unknown) {
-    const err = error as { message?: string; code?: number };
-    return rejectWithValue(err.message || 'Failed to delete user');
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    return rejectWithValue(errorInfo.message);
   }
 });
 
@@ -84,9 +85,9 @@ export const fetchUserFiles = createAsyncThunk<
   try {
     const response = await userAPI.getUserFiles(id, params);
     return response.data.items;
-  } catch (error: unknown) {
-    const err = error as { message?: string; code?: number };
-    return rejectWithValue(err.message || 'Failed to fetch user files');
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    return rejectWithValue(errorInfo.message);
   }
 });
 
@@ -105,9 +106,9 @@ export const downloadUserFiles = createAsyncThunk<
     anchor.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(anchor);
-  } catch (error: unknown) {
-    const err = error as { message?: string; code?: number };
-    return rejectWithValue(err.message || 'Failed to download user files');
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    return rejectWithValue(errorInfo.message);
   }
 });
 
