@@ -1,14 +1,20 @@
+import { APIClient } from './apiClient';
 import type {
   ModulListResponse,
   SuccessResponse,
-  ErrorResponse,
-  ValidationErrorResponse,
-  UploadSlotResponse,
   UploadInfoResponse,
 } from '@/types';
-import { tusHelper, type ModulUploadMetadata, type UploadCallbacks, type ActiveUpload } from './tusHelper';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+import {
+  TUSUploadManager,
+  type TUSUploadOptions,
+  type TUSActiveUpload,
+  TUSClient,
+  type TUSSlotInfo,
+  TUSMetadataValidator,
+  type ModulMetadata,
+  TUSErrorHandler,
+  TUSErrorType,
+} from './tus';
 
 export interface ModulUpdateMetadataRequest {
   nama_file: string;
@@ -23,37 +29,25 @@ export interface ModulUpdateMetadataResponse {
   data: null;
 }
 
-class ModulAPIClient {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token');
-    return {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
+export interface ModulUploadCallbacks {
+  onProgress: (progress: { percentage: number; bytesUploaded: number; bytesTotal: number; speed: number; eta: number }) => void;
+  onSuccess: () => void;
+  onError: (error: Error) => void;
+}
+
+class ModulAPIClient extends APIClient {
+  private tusUploadManager: TUSUploadManager;
+  private tusClient: TUSClient;
+
+  constructor() {
+    super();
+    this.tusUploadManager = new TUSUploadManager();
+    this.tusClient = new TUSClient();
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
-
-    const response = await fetch(url, {
-      headers: this.getAuthHeaders(),
-      ...options,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw data as ErrorResponse | ValidationErrorResponse;
-    }
-
-    return data as T;
-  }
-
-  getFileType(file: File): string {
+  getFileType(file: File): 'docx' | 'xlsx' | 'pdf' | 'pptx' | string {
     const ext = file.name.toLowerCase().split('.').pop() || '';
-    const typeMap: Record<string, string> = {
+    const typeMap: Record<string, 'docx' | 'xlsx' | 'pdf' | 'pptx'> = {
       'docx': 'docx',
       'xlsx': 'xlsx',
       'pdf': 'pdf',
@@ -63,88 +57,149 @@ class ModulAPIClient {
   }
 
   validateModulFile(file: File): { valid: boolean; error?: string } {
-    return tusHelper.validateFile(file, 'modul');
-  }
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    const ALLOWED_TYPES = ['docx', 'xlsx', 'pdf', 'pptx'];
 
-  async checkUploadSlot(): Promise<UploadSlotResponse> {
-    return tusHelper.checkUploadSlot('/modul/upload/check-slot');
-  }
-
-  async pollForAvailableSlot(maxWaitTimeMs = 30000, pollIntervalMs = 2000): Promise<UploadSlotResponse> {
-    const startTime = Date.now();
-    
-    while (Date.now() - startTime < maxWaitTimeMs) {
-      const slotResponse = await this.checkUploadSlot();
-      
-      if (slotResponse.data.available) {
-        return slotResponse;
-      }
-
-      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: 'Ukuran file modul tidak boleh lebih dari 50MB',
+      };
     }
 
-    throw new Error('Antrian penuh. Maksimal 5 file per user. Silakan tunggu upload selesai.');
+    const fileType = this.getFileType(file);
+    if (!ALLOWED_TYPES.includes(fileType)) {
+      return {
+        valid: false,
+        error: 'Tipe file tidak didukung. Hanya .docx, .xlsx, .pdf, dan .pptx yang diperbolehkan',
+      };
+    }
+
+    return { valid: true };
+  }
+
+  validateModulMetadata(metadata: Partial<ModulMetadata>): { valid: boolean; errors?: string[] } {
+    const errors = TUSMetadataValidator.validateModulMetadata(metadata);
+    
+    if (errors.length > 0) {
+      return {
+        valid: false,
+        errors: errors.map(e => e.message),
+      };
+    }
+
+    return { valid: true };
+  }
+
+  async checkUploadSlot(): Promise<TUSSlotInfo> {
+    return this.tusClient.checkSlot('/modul/upload/check-slot');
+  }
+
+  async pollForAvailableSlot(maxWaitTimeMs = 30000, pollIntervalMs = 1000): Promise<TUSSlotInfo> {
+    try {
+      return await this.tusClient.pollForSlot(
+        '/modul/upload/check-slot',
+        maxWaitTimeMs,
+        pollIntervalMs
+      );
+    } catch (error) {
+      const tusError = TUSErrorHandler.handleError(error);
+      if (tusError.type === TUSErrorType.QUEUE_FULL) {
+        throw new Error('Antrian penuh. Maksimal 5 file per user. Silakan tunggu upload selesai.');
+      }
+      throw tusError;
+    }
   }
 
   async uploadModulWithChunks(
     file: File,
-    metadata: ModulUploadMetadata,
-    callbacks: UploadCallbacks
-  ): Promise<ActiveUpload> {
+    metadata: ModulMetadata,
+    callbacks: ModulUploadCallbacks
+  ): Promise<string> {
     const validation = this.validateModulFile(file);
     if (!validation.valid) {
       throw new Error(validation.error);
     }
 
-    const uploadId = await tusHelper.startUpload(file, {
-      metadata: metadata,
-      callbacks,
-      type: 'modul',
-      endpoint: '/modul/upload',
-    });
-
-    const activeUpload = tusHelper.getActiveUpload(uploadId);
-    if (!activeUpload) {
-      throw new Error('Gagal memulai upload');
+    const metadataValidation = this.validateModulMetadata(metadata);
+    if (!metadataValidation.valid) {
+      throw new Error(metadataValidation.errors?.join(', '));
     }
 
-    return activeUpload;
+    const options: TUSUploadOptions = {
+      file,
+      endpoint: '/modul/upload',
+      metadata,
+      metadataType: 'modul',
+      checkSlot: true,
+      pollForSlot: false,
+      onProgress: (progress) => {
+        callbacks.onProgress({
+          percentage: progress.percentage,
+          bytesUploaded: progress.bytesUploaded,
+          bytesTotal: progress.bytesTotal,
+          speed: progress.speed || 0,
+          eta: progress.remainingTime || 0,
+        });
+      },
+      onSuccess: callbacks.onSuccess,
+      onError: (error) => {
+        callbacks.onError(new Error(error.message));
+      },
+    };
+
+    return this.tusUploadManager.startUpload(options);
   }
 
   async updateModulWithChunks(
     id: number,
     file: File,
-    metadata: ModulUploadMetadata,
-    callbacks: UploadCallbacks
-  ): Promise<ActiveUpload> {
+    metadata: ModulMetadata,
+    callbacks: ModulUploadCallbacks
+  ): Promise<string> {
     const validation = this.validateModulFile(file);
     if (!validation.valid) {
       throw new Error(validation.error);
     }
 
-    const uploadId = await tusHelper.startUpload(file, {
-      metadata: metadata,
-      callbacks,
-      type: 'modul',
-      isUpdate: true,
-      projectId: id,
-      endpoint: `/modul/${id}/upload`,
-    });
-
-    const activeUpload = tusHelper.getActiveUpload(uploadId);
-    if (!activeUpload) {
-      throw new Error('Gagal memulai update upload');
+    const metadataValidation = this.validateModulMetadata(metadata);
+    if (!metadataValidation.valid) {
+      throw new Error(metadataValidation.errors?.join(', '));
     }
 
-    return activeUpload;
+    const options: TUSUploadOptions = {
+      file,
+      endpoint: `/modul/${id}/upload`,
+      metadata,
+      metadataType: 'modul',
+      isUpdate: true,
+      resourceId: id,
+      checkSlot: true,
+      pollForSlot: false,
+      onProgress: (progress) => {
+        callbacks.onProgress({
+          percentage: progress.percentage,
+          bytesUploaded: progress.bytesUploaded,
+          bytesTotal: progress.bytesTotal,
+          speed: progress.speed || 0,
+          eta: progress.remainingTime || 0,
+        });
+      },
+      onSuccess: callbacks.onSuccess,
+      onError: (error) => {
+        callbacks.onError(new Error(error.message));
+      },
+    };
+
+    return this.tusUploadManager.startUpload(options);
   }
 
   async pollAndUpdateModulWithChunks(
     id: number,
     file: File,
-    metadata: ModulUploadMetadata,
-    callbacks: UploadCallbacks
-  ): Promise<ActiveUpload> {
+    metadata: ModulMetadata,
+    callbacks: ModulUploadCallbacks
+  ): Promise<string> {
     await this.pollForAvailableSlot();
     return this.updateModulWithChunks(id, file, metadata, callbacks);
   }
@@ -165,49 +220,77 @@ class ModulAPIClient {
       throw new Error('Jumlah file, nama, dan semester harus sama');
     }
 
+    const uploadPromises: Promise<void>[] = [];
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const nama_file = names[i];
       const semester = semesters[i];
 
-      try {
-        await this.pollForAvailableSlot();
+      const uploadPromise = (async () => {
+        try {
+          await this.pollForAvailableSlot();
 
-        await this.uploadModulWithChunks(
-          file,
-          { 
-            nama_file, 
-            tipe: this.getFileType(file),
-            semester: semester.toString()
-          },
-          {
-            onProgress: (progress) => {
-              onFileProgress(i, progress.percentage);
-            },
-            onSuccess: () => {
-              onFileComplete(i);
-            },
-            onError: (error) => {
-              onFileError(i, error);
-            },
+          const fileType = this.getFileType(file);
+          if (!['docx', 'xlsx', 'pdf', 'pptx'].includes(fileType)) {
+            throw new Error(`Tipe file ${fileType} tidak didukung`);
           }
-        );
 
-        await new Promise<void>((resolve) => {
-          const checkInterval = setInterval(() => {
-            const upload = tusHelper.getActiveUpload(file.name);
-            if (!upload || !upload.isUploading) {
-              clearInterval(checkInterval);
-              resolve();
+          const metadata: ModulMetadata = {
+            nama_file,
+            tipe: fileType as 'docx' | 'xlsx' | 'pdf' | 'pptx',
+            semester,
+          };
+
+          const uploadId = await this.uploadModulWithChunks(
+            file,
+            metadata,
+            {
+              onProgress: (progress) => {
+                onFileProgress(i, progress.percentage);
+              },
+              onSuccess: () => {
+                onFileComplete(i);
+              },
+              onError: (error) => {
+                onFileError(i, error);
+              },
             }
-          }, 500);
-        });
+          );
 
-      } catch (error) {
-        onFileError(i, error as Error);
-        throw error;
-      }
+          await this.waitForUploadComplete(uploadId);
+        } catch (error) {
+          onFileError(i, error as Error);
+          throw error;
+        }
+      })();
+
+      uploadPromises.push(uploadPromise);
     }
+
+    await Promise.all(uploadPromises);
+  }
+
+  private async waitForUploadComplete(uploadId: string, maxWaitMs = 300000): Promise<void> {
+    const startTime = Date.now();
+    const pollInterval = 500;
+
+    return new Promise((resolve, reject) => {
+      const checkInterval = setInterval(() => {
+        const upload = this.tusUploadManager.getActiveUpload(uploadId);
+
+        if (!upload || !upload.isUploading) {
+          clearInterval(checkInterval);
+          resolve();
+          return;
+        }
+
+        if (Date.now() - startTime > maxWaitMs) {
+          clearInterval(checkInterval);
+          reject(new Error('Upload timeout'));
+        }
+      }, pollInterval);
+    });
   }
 
   async getModuls(params?: {
@@ -217,68 +300,51 @@ class ModulAPIClient {
     page?: number;
     limit?: number;
   }): Promise<ModulListResponse> {
-    const searchParams = new URLSearchParams();
-    if (params?.search) searchParams.append('search', params.search);
-    if (params?.filter_type) searchParams.append('filter_type', params.filter_type);
-    if (params?.filter_semester) searchParams.append('filter_semester', params.filter_semester.toString());
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-
-    const query = searchParams.toString();
-    const endpoint = `/modul${query ? `?${query}` : ''}`;
-
-    return this.request<ModulListResponse>(endpoint);
+    return this.get<ModulListResponse>('/modul', params);
   }
 
   async updateModulMetadata(id: number, data: ModulUpdateMetadataRequest): Promise<ModulUpdateMetadataResponse> {
-    return this.request<ModulUpdateMetadataResponse>(`/modul/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders(),
-      },
-      body: JSON.stringify(data),
-    });
+    return this.patch<ModulUpdateMetadataResponse>(`/modul/${id}`, data);
   }
 
   async deleteModul(id: number): Promise<SuccessResponse> {
-    return this.request<SuccessResponse>(`/modul/${id}`, {
-      method: 'DELETE',
-    });
+    return this.delete<SuccessResponse>(`/modul/${id}`);
   }
 
-  async downloadModuls(ids: number[]): Promise<Blob> {
-    const response = await fetch(`${API_BASE_URL}/modul/download`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders(),
-      },
-      body: JSON.stringify({ ids }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw errorData as ErrorResponse | ValidationErrorResponse;
-    }
-
-    return response.blob();
+  async downloadModuls(ids: number[]): Promise<{ blob: Blob; filename: string }> {
+    return this.download('/modul/download', { ids });
   }
 
   async cancelUpload(uploadId: string): Promise<void> {
-    return tusHelper.cancelUpload(uploadId);
+    return this.tusUploadManager.cancelUpload(uploadId);
   }
 
   async getUploadInfo(uploadId: string): Promise<UploadInfoResponse> {
-    return this.request<UploadInfoResponse>(`/modul/upload/${uploadId}`);
+    return this.get<UploadInfoResponse>(`/modul/upload/${uploadId}`);
   }
 
-  async getUploadStatus(uploadUrl: string): Promise<{ offset: number; length: number }> {
-    return tusHelper.getUploadStatus(uploadUrl);
+  async getUploadStatus(uploadId: string): Promise<{ offset: number; length: number; progress: number } | null> {
+    const upload = this.tusUploadManager.getActiveUpload(uploadId);
+    
+    if (!upload) {
+      return null;
+    }
+
+    const progress = upload.progressTracker.getProgress();
+
+    return {
+      offset: upload.offset,
+      length: upload.length,
+      progress: progress.percentage,
+    };
   }
 
-  getAllActiveUploads(): Map<string, ActiveUpload> {
-    return tusHelper.getAllActiveUploads();
+  getAllActiveUploads(): Map<string, TUSActiveUpload> {
+    return this.tusUploadManager.getAllActiveUploads();
+  }
+
+  getUpload(uploadId: string): TUSActiveUpload | undefined {
+    return this.tusUploadManager.getActiveUpload(uploadId);
   }
 }
 
