@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { authAPI } from './auth';
-import { clearProfile, fetchProfile } from './profileSlice';
+import { clearProfile } from './profileSlice';
 import { handleAPIError } from './apiUtils';
 import type { User, AuthRequest, RegisterRequest, AuthSuccessResponse } from '@/types';
 
@@ -42,13 +42,13 @@ export const login = createAsyncThunk<
   { rejectValue: string }
 >('auth/login', async (credentials, { rejectWithValue, dispatch }) => {
   try {
+    dispatch(clearProfile());
+
     const response = await authAPI.login(credentials);
 
     localStorage.setItem('access_token', response.data.access_token);
     localStorage.setItem('refresh_token', response.data.refresh_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));
-
-    dispatch(fetchProfile());
 
     return response;
   } catch (error) {
@@ -68,13 +68,13 @@ export const register = createAsyncThunk<
   { rejectValue: string }
 >('auth/register', async (userData, { rejectWithValue, dispatch }) => {
   try {
+    dispatch(clearProfile());
+
     const response = await authAPI.register(userData);
 
     localStorage.setItem('access_token', response.data.access_token);
     localStorage.setItem('refresh_token', response.data.refresh_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));
-
-    dispatch(fetchProfile());
 
     return response;
   } catch (error) {
@@ -149,6 +149,9 @@ const authSlice = createSlice({
 
 export const logoutThunk = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
   dispatch(clearProfile());
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
 });
 
 export const { clearAuthState, clearError } = authSlice.actions;

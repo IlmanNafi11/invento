@@ -31,6 +31,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { getInitials } from "@/utils/format";
+import { getProfileImageUrl } from "@/utils/profileUtils";
 import { useAppDispatch, useAppSelector } from "@/hooks/useAppDispatch";
 import { updateProfile } from "@/lib/profileSlice";
 import { toast } from "sonner";
@@ -140,7 +141,7 @@ export function UpdateProfileDialog({
           <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-10">
             <Avatar className="w-20 h-20 border-4 border-white">
               <AvatarImage
-                src={previewImage || (profile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${profile.foto_profil.startsWith('/') ? profile.foto_profil : `/${profile.foto_profil}`}` : undefined)}
+                src={previewImage || getProfileImageUrl(profile?.foto_profil, profile?.created_at)}
                 alt={profile?.name || "User"}
               />
               <AvatarFallback className="text-lg">

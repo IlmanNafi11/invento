@@ -53,10 +53,25 @@ class UserAPIClient extends APIClient {
   }
 
   async updateProfile(formData: FormData): Promise<Profile> {
-    const response = await this.upload<ProfileResponse>('/profile', formData, {
-      customHeaders: {},
+    const headers: HeadersInit = {
+      ...this.getAuthHeaders(false),
+    };
+
+    const url = `${this.baseURL}/profile`;
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: formData,
     });
-    return response.data;
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw data;
+    }
+
+    return (data as ProfileResponse).data;
   }
 
   async downloadUserFiles(

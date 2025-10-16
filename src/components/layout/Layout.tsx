@@ -35,17 +35,18 @@ import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useProfile } from "@/hooks/useProfile";
 import { setSidebarOpen } from "@/lib/sidebarSlice";
 import { logout } from "@/lib/authSlice";
-import { fetchProfile } from "@/lib/profileSlice";
 import { ProfileDialog } from "@/components/common/ProfileDialog";
 import { getInitials } from "@/utils/format";
+import { getProfileImageUrl } from "@/utils/profileUtils";
 import { authAPI } from "@/lib/auth";
 
 export default function Layout() {
   const isOpen = useAppSelector((state) => state.sidebar.open);
   const currentUser = useAppSelector((state) => state.auth.user);
-  const userProfile = useAppSelector((state) => state.profile.profile);
+  const { profile: userProfile, refreshProfile } = useProfile();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
@@ -69,14 +70,8 @@ export default function Layout() {
     }
   }, [shouldNavigateToLogin, navigate]);
 
-  useEffect(() => {
-    if (currentUser && !userProfile) {
-      dispatch(fetchProfile());
-    }
-  }, [currentUser, userProfile, dispatch]);
-
   const handleProfileUpdate = () => {
-    dispatch(fetchProfile());
+    refreshProfile();
   };
 
   const hasModulRead = hasPermission('modul', 'read');
@@ -177,7 +172,7 @@ export default function Layout() {
         <DropdownMenuTrigger asChild>
           <div className="flex items-center gap-2 p-2 rounded-md hover:bg-sidebar-accent cursor-pointer group-data-[collapsible=icon]:justify-center">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
+              <AvatarImage src={getProfileImageUrl(userProfile?.foto_profil, userProfile?.created_at)} alt="User" />
               <AvatarFallback>{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col group-data-[collapsible=icon]:hidden min-w-0">
@@ -189,7 +184,7 @@ export default function Layout() {
         <DropdownMenuContent align="end" className="w-56">
           <div className="px-2 py-1.5 text-sm flex items-center gap-2">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
+              <AvatarImage src={getProfileImageUrl(userProfile?.foto_profil, userProfile?.created_at)} alt="User" />
               <AvatarFallback className="text-xs">{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
             </Avatar>
             <div>
@@ -224,7 +219,7 @@ export default function Layout() {
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-accent">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
+                  <AvatarImage src={getProfileImageUrl(userProfile?.foto_profil, userProfile?.created_at)} alt="User" />
                   <AvatarFallback>{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col min-w-0">
@@ -236,7 +231,7 @@ export default function Layout() {
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-2 py-1.5 text-sm flex items-center gap-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={userProfile?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${userProfile.foto_profil.startsWith('/') ? userProfile.foto_profil : `/${userProfile.foto_profil}`}` : undefined} alt="User" />
+                  <AvatarImage src={getProfileImageUrl(userProfile?.foto_profil, userProfile?.created_at)} alt="User" />
                   <AvatarFallback className="text-xs">{userProfile?.name ? getInitials(userProfile.name) : (currentUser ? getInitials(currentUser.email) : 'U')}</AvatarFallback>
                 </Avatar>
                 <div>

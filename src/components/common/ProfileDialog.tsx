@@ -12,8 +12,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Mail, Briefcase, FileText, Calendar } from "lucide-react";
-import { formatDate } from "@/utils/format";
-import { getInitials } from "@/utils/format";
+import { formatDate, getInitials } from "@/utils/format";
+import { getProfileImageUrl } from "@/utils/profileUtils";
 import { UpdateProfileDialog } from "./UpdateProfileDialog";
 import type { Profile } from "@/types";
 
@@ -57,7 +57,7 @@ export function ProfileDialog({ user, open, onOpenChange, onProfileUpdate }: Pro
           <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-10">
             <Avatar className="w-20 h-20 border-4 border-white">
               <AvatarImage
-                src={user?.foto_profil ? `${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${user.foto_profil.startsWith('/') ? user.foto_profil : `/${user.foto_profil}`}` : undefined}
+                src={getProfileImageUrl(user?.foto_profil, user?.created_at)}
                 alt={user?.name || "User"}
               />
               <AvatarFallback className="text-lg">
