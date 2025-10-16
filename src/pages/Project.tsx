@@ -123,11 +123,6 @@ export default function Project() {
       return;
     }
 
-    if (files.length > 5) {
-      toast.error('Maksimal 5 file per upload');
-      return;
-    }
-
     for (const fileData of files) {
       if (fileData.file) {
         const validation = projectAPI.validateProjectFile(fileData.file);
@@ -150,65 +145,72 @@ export default function Project() {
     let completedCount = 0;
     let hasError = false;
 
-    for (let i = 0; i < files.length; i++) {
-      const fileData = files[i];
-      if (!fileData.file || !fileData.category || !fileData.semester) continue;
+    const fileData = files[0];
+    if (!fileData.file || !fileData.category || !fileData.semester) {
+      setIsUploading(false);
+      return;
+    }
 
-      try {
-        setUploadStates(prev => prev.map(state =>
-          state.index === i ? { ...state, status: 'waiting' } : state
-        ));
+    try {
+      setUploadStates(prev => prev.map(state =>
+        state.index === 0 ? { ...state, status: 'waiting' } : state
+      ));
 
-        toast.info(`Menunggu slot upload untuk ${fileData.file.name}...`);
+      toast.info(`Menunggu slot upload untuk ${fileData.file.name}...`);
 
-        await projectAPI.pollAndUploadProjectWithChunks(
-          fileData.file,
+      await new Promise<void>((resolve, reject) => {
+        projectAPI.pollAndUploadProjectWithChunks(
+          fileData.file!,
           {
             nama_project: fileData.name,
-            kategori: fileData.category,
-            semester: fileData.semester,
-            filename: fileData.file.name,
-            filetype: fileData.file.type,
+            kategori: fileData.category!,
+            semester: fileData.semester!,
+            filename: fileData.file!.name,
+            filetype: fileData.file!.type,
           },
           {
             onProgress: (progress) => {
               setUploadStates(prev => prev.map(state =>
-                state.index === i ? { ...state, progress: progress.percentage, status: 'uploading' } : state
+                state.index === 0 ? { ...state, progress: progress.percentage, status: 'uploading' } : state
               ));
             },
             onSuccess: () => {
               setUploadStates(prev => prev.map(state =>
-                state.index === i ? { ...state, progress: 100, status: 'completed' } : state
+                state.index === 0 ? { ...state, progress: 100, status: 'completed' } : state
               ));
               completedCount++;
+              resolve();
             },
             onError: (error) => {
               setUploadStates(prev => prev.map(state =>
-                state.index === i ? { ...state, status: 'error', error: error.message } : state
+                state.index === 0 ? { ...state, status: 'error', error: error.message } : state
               ));
               toast.error(`${fileData.file!.name}: ${error.message}`);
               hasError = true;
+              reject(error);
             },
           }
-        );
-      } catch (error) {
-        const err = error as ErrorResponse | ValidationErrorResponse;
-        setUploadStates(prev => prev.map(state =>
-          state.index === i ? { ...state, status: 'error', error: err.message } : state
-        ));
-        hasError = true;
-      }
+        ).catch(reject);
+      });
+    } catch (error) {
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      setUploadStates(prev => prev.map(state =>
+        state.index === 0 ? { ...state, status: 'error', error: err.message } : state
+      ));
+      hasError = true;
     }
 
     setIsUploading(false);
     
-    if (!hasError) {
+    if (!hasError && completedCount > 0) {
       setTimeout(() => {
         setUploadStates([]);
         setIsCreateOpen(false);
         toast.success(`${completedCount} project berhasil diupload`);
         loadProjects();
-      }, 1000);
+      }, 1500);
+    } else if (!hasError && completedCount === 0) {
+      toast.error('Upload gagal, tidak ada project yang berhasil diupload');
     }
   };
 
