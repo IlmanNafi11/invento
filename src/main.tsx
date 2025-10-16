@@ -12,6 +12,22 @@ import App from './App.tsx'
 
 setStoreGetter(() => store);
 
+// Suppress console errors for expected auth initialization failures
+const originalError = console.error;
+console.error = function(...args: unknown[]) {
+  // Suppress 400 errors on /auth/refresh endpoint during initialization
+  if (
+    Array.isArray(args) &&
+    args.some(arg => 
+      typeof arg === 'string' && 
+      arg.includes('POST http://localhost:3000/api/v1/auth/refresh 400')
+    )
+  ) {
+    return;
+  }
+  originalError.apply(console, args as Parameters<typeof console.error>);
+};
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Provider store={store}>

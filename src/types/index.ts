@@ -383,3 +383,16 @@ export interface UpdateProfileRequest {
   jenis_kelamin?: string;
   foto_profil?: File;
 }
+
+export interface ResetPasswordOTPInitResponse extends BaseResponse {
+  data: {
+    message: string;
+    expires_in: number;
+  };
+}
+
+export interface VerifyOTPResponse extends BaseResponse {
+  data?: {
+    message: string;
+  };
+}

@@ -10,7 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useForgotPassword } from "@/hooks/useForgotPassword";
+import { useAppDispatch } from "@/hooks/useAppDispatch";
+import { confirmResetPasswordOTP } from "@/lib/authSlice";
 import { WaveBackground } from "@/components/common/WaveBackground";
+import { ForgotPasswordDialog } from "@/components/common/ForgotPasswordDialog";
+import { OTPVerificationDialog } from "@/components/common/OTPVerificationDialog";
+import { PasswordResetDialog } from "@/components/common/PasswordResetDialog";
 
 const loginSchema = z.object({
   email: z.string().email("Format email tidak valid"),
@@ -19,10 +26,14 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+type ResetPasswordStep = 'idle' | 'email' | 'otp' | 'password' | 'success';
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useAppDispatch();
   const { login: loginUser, loading, error, isAuthenticated, clearError } = useAuth();
+  const { loading: permissionsLoading } = usePermissions();
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const {
@@ -35,6 +46,22 @@ export default function Login() {
 
   const emailField = register("email");
   const passwordField = register("password");
+
+  // Forgot password states
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<ResetPasswordStep>('idle');
+  const [forgotPasswordDialogOpen, setForgotPasswordDialogOpen] = useState(false);
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [passwordResetDialogOpen, setPasswordResetDialogOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtpExpiresIn, setResetOtpExpiresIn] = useState(600);
+
+  const { 
+    state: forgotPasswordState,
+    initiateOTP, 
+    verifyOTP, 
+    resendOTP,
+    loading: forgotPasswordLoading 
+  } = useForgotPassword();
 
   const from = location.state?.from?.pathname || "/dashboard";
 
@@ -56,6 +83,95 @@ export default function Login() {
     if (error) {
       clearError();
     }
+  };
+
+  // Forgot Password Flow Handlers
+  const handleForgotPasswordClick = () => {
+    setForgotPasswordStep('email');
+    setForgotPasswordDialogOpen(true);
+  };
+
+  const handleForgotPasswordSubmit = async (email: string) => {
+    const result = await initiateOTP(email);
+    if (result.success) {
+      setResetEmail(email);
+      setResetOtpExpiresIn(result.expiresIn || 600);
+      setForgotPasswordStep('otp');
+      setForgotPasswordDialogOpen(false);
+      setOtpDialogOpen(true);
+    } else {
+      throw new Error(result.error || 'Gagal mengirim OTP');
+    }
+  };
+
+  const handleOTPSubmit = async (code: string) => {
+    const result = await verifyOTP(resetEmail, code);
+    if (result.success) {
+      setForgotPasswordStep('password');
+      setOtpDialogOpen(false);
+      setPasswordResetDialogOpen(true);
+    } else {
+      throw new Error(result.error || 'OTP verifikasi gagal');
+    }
+  };
+
+  const handleOTPResend = async () => {
+    const result = await resendOTP(resetEmail);
+    if (!result.success) {
+      throw new Error(result.error || 'Gagal mengirim ulang OTP');
+    }
+  };
+
+  const handlePasswordResetSubmit = async (newPassword: string) => {
+    try {
+      await dispatch(confirmResetPasswordOTP({
+        email: resetEmail,
+        code: forgotPasswordState.otpCode,
+        new_password: newPassword,
+      })).unwrap();
+      
+      setForgotPasswordStep('success');
+      setPasswordResetDialogOpen(false);
+
+      // Wait for permissions to load before redirecting
+      // Max wait time: 5 seconds to prevent infinite loading
+      const maxWaitTime = 5000;
+      const startTime = Date.now();
+      
+      const waitForPermissionsReady = () => {
+        return new Promise<void>((resolve) => {
+          const checkPermissions = () => {
+            const elapsed = Date.now() - startTime;
+            
+            // Check if permissions loaded or timeout reached
+            if (!permissionsLoading || elapsed > maxWaitTime) {
+              resolve();
+            } else {
+              // Check again after 100ms
+              setTimeout(checkPermissions, 100);
+            }
+          };
+          
+          checkPermissions();
+        });
+      };
+
+      await waitForPermissionsReady();
+      
+      setForgotPasswordStep('idle');
+      navigate(from, { replace: true });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Gagal mereset password';
+      throw new Error(errorMessage);
+    }
+  };
+
+  const handleCloseForgotPasswordFlow = () => {
+    setForgotPasswordStep('idle');
+    setForgotPasswordDialogOpen(false);
+    setOtpDialogOpen(false);
+    setPasswordResetDialogOpen(false);
+    setResetEmail('');
   };
 
   return (
@@ -97,9 +213,17 @@ export default function Login() {
                 {errors.email && <p className="text-sm text-red-300">{errors.email.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-white">
-                  Password
-                </Label>
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="password" className="text-sm font-medium text-white">
+                    Password
+                  </Label>
+                  <span
+                    onClick={!(loading || isRedirecting) ? handleForgotPasswordClick : undefined}
+                    className={`cursor-pointer text-sm text-white/70 hover:text-white ${loading || isRedirecting ? 'cursor-not-allowed opacity-50' : ''}`}
+                  >
+                    Lupa password?
+                  </span>
+                </div>
                 <Input
                   id="password"
                   type="password"
@@ -133,15 +257,51 @@ export default function Login() {
                 )}
               </Button>
             </form>
-            <div className="text-center text-sm text-white/70">
-              Belum memiliki akun?{" "}
-              <Link to="/register" className="font-medium text-white hover:text-white/80">
-                Daftar sekarang
-              </Link>
+            <div className="flex flex-col gap-3 text-center text-sm text-white/70">
+              <div>
+                Belum memiliki akun?{" "}
+                <Link to="/register" className="font-medium text-white hover:text-white/80">
+                  Daftar sekarang
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Forgot Password Dialogs */}
+      <ForgotPasswordDialog
+        open={forgotPasswordDialogOpen && forgotPasswordStep === 'email'}
+        onOpenChange={(open) => {
+          if (!open) handleCloseForgotPasswordFlow();
+          else setForgotPasswordDialogOpen(true);
+        }}
+        onSubmit={handleForgotPasswordSubmit}
+        loading={forgotPasswordLoading}
+      />
+
+      <OTPVerificationDialog
+        open={otpDialogOpen && forgotPasswordStep === 'otp'}
+        onOpenChange={(open) => {
+          if (!open) handleCloseForgotPasswordFlow();
+          else setOtpDialogOpen(true);
+        }}
+        onSubmit={handleOTPSubmit}
+        onResend={handleOTPResend}
+        loading={forgotPasswordLoading}
+        initialExpiresIn={resetOtpExpiresIn}
+        email={resetEmail}
+      />
+
+      <PasswordResetDialog
+        open={passwordResetDialogOpen && forgotPasswordStep === 'password'}
+        onOpenChange={(open) => {
+          if (!open) handleCloseForgotPasswordFlow();
+          else setPasswordResetDialogOpen(true);
+        }}
+        onSubmit={handlePasswordResetSubmit}
+        loading={forgotPasswordLoading}
+      />
     </div>
   );
 }

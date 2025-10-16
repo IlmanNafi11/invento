@@ -32,7 +32,8 @@ export const initializeAuth = createAsyncThunk<
       access_token: response.data.access_token,
     };
   } catch {
-    console.log('No valid session found or initialization failed');
+    // Silently handle initialization errors (no session, refresh token invalid, etc)
+    // This is expected behavior when user first visits without valid session
     return null;
   }
 });
@@ -73,6 +74,27 @@ export const register = createAsyncThunk<
       return rejectWithValue('Email sudah terdaftar');
     }
     
+    return rejectWithValue(errorInfo.message);
+  }
+});
+
+interface ConfirmResetPasswordPayload {
+  email: string;
+  code: string;
+  new_password: string;
+}
+
+export const confirmResetPasswordOTP = createAsyncThunk<
+  AuthSuccessResponse,
+  ConfirmResetPasswordPayload,
+  { rejectValue: string }
+>('auth/confirmResetPasswordOTP', async (payload, { rejectWithValue, dispatch }) => {
+  try {
+    dispatch(clearProfile());
+    const response = await authAPI.confirmResetPasswordOTP(payload);
+    return response;
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
     return rejectWithValue(errorInfo.message);
   }
 });
@@ -160,6 +182,21 @@ const authSlice = createSlice({
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Registrasi gagal';
+      })
+      .addCase(confirmResetPasswordOTP.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(confirmResetPasswordOTP.fulfilled, (state, action: PayloadAction<AuthSuccessResponse>) => {
+        state.loading = false;
+        state.user = action.payload.data.user;
+        state.accessToken = action.payload.data.access_token;
+        state.isAuthenticated = true;
+        state.error = null;
+      })
+      .addCase(confirmResetPasswordOTP.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Reset password gagal';
       })
       .addCase(logout.fulfilled, (state) => {
         state.user = null;
