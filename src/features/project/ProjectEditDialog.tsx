@@ -10,31 +10,33 @@ import {
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
-import { ModulUploadProgress, type FileUploadState } from './ModulUploadProgress';
-import type { ModulListItem } from '@/types';
+import { ProjectUploadProgress, type FileUploadState } from './ProjectUploadProgress';
+import type { ProjectListItem, ProjectCategory } from '@/types';
 
-interface ModulForm {
-  files: { file?: File; name: string; semester?: number; existingFileSize?: string }[];
+interface ProjectForm {
+  files: { file?: File; name: string; category?: ProjectCategory; semester?: number; existingFileSize?: string }[];
 }
 
-interface ModulEditDialogProps {
+interface ProjectEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: ModulForm) => Promise<void>;
-  editingItem: ModulListItem | null;
+  onSubmit: (data: ProjectForm) => Promise<void>;
+  editingItem: ProjectListItem | null;
   uploadStates: FileUploadState[];
   isLoading: boolean;
+  categoryOptions: { value: ProjectCategory | ''; label: string }[];
 }
 
-export function ModulEditDialog({
+export function ProjectEditDialog({
   open,
   onOpenChange,
   onSubmit,
   editingItem,
   uploadStates,
   isLoading,
-}: ModulEditDialogProps) {
-  const form = useForm<ModulForm>({
+  categoryOptions,
+}: ProjectEditDialogProps) {
+  const form = useForm<ProjectForm>({
     defaultValues: {
       files: [],
     },
@@ -43,8 +45,9 @@ export function ModulEditDialog({
   useEffect(() => {
     if (editingItem && open) {
       form.setValue('files', [{
-        file: new File([], editingItem.nama_file),
-        name: editingItem.nama_file,
+        file: new File([], editingItem.nama_project),
+        name: editingItem.nama_project,
+        category: editingItem.kategori as ProjectCategory,
         semester: editingItem.semester,
         existingFileSize: editingItem.ukuran,
       }]);
@@ -68,26 +71,27 @@ export function ModulEditDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="!max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Modul</DialogTitle>
+          <DialogTitle>Edit Project</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={handleSubmit} className="space-y-6">
             <FileInput
-              label="File Modul"
-              accept=".docx,.xlsx,.pdf,.pptx"
-              onChange={(files) => form.setValue('files', files)}
+              label="File Project"
+              accept=".zip"
+              onChange={(files) => form.setValue('files', files as { file?: File; name: string; category?: ProjectCategory; semester?: number; existingFileSize?: string }[])}
               value={form.watch('files')}
-              showCategory={false}
+              categoryOptions={categoryOptions.filter(c => c.value !== '')}
+              showCategory
               showSemester
               editableName
               multiple={false}
-              nameLabel="Nama Modul"
-              namePlaceholder="Masukkan nama modul"
-              fileLabel="File Modul"
+              nameLabel="Nama Project"
+              namePlaceholder="Masukkan nama project"
+              fileLabel="File Project (ZIP)"
               layout="grid"
             />
 
-            <ModulUploadProgress uploadStates={uploadStates} />
+            <ProjectUploadProgress uploadStates={uploadStates} />
 
             <div className="flex justify-end gap-2">
               <Button

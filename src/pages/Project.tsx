@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { Upload, Search, Filter, Edit, Trash2, Loader2, Download, X, File, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   useReactTable,
@@ -10,16 +8,9 @@ import {
   type ColumnDef,
   flexRender,
 } from '@tanstack/react-table';
+import { Search, Upload, Edit, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -37,42 +28,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatDate } from '@/utils/format';
 import { useDebounce } from '@/hooks/useDebounce';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useProject } from '@/hooks/useProject';
 import { projectAPI } from '@/lib/projectAPI';
-import type { ProjectListItem, ProjectCategory, ErrorResponse, ValidationErrorResponse, UploadProgress } from '@/types';
+import { ProjectUploadDialog } from '@/features/project/ProjectUploadDialog';
+import { ProjectEditDialog } from '@/features/project/ProjectEditDialog';
+import { ProjectFilterDialog } from '@/features/project/ProjectFilterDialog';
+import type { ProjectListItem, ProjectCategory, ErrorResponse, ValidationErrorResponse } from '@/types';
+import type { FileUploadState } from '@/features/project/ProjectUploadProgress';
 
 const categoryOptions: { value: ProjectCategory | ''; label: string }[] = [
   { value: '', label: 'Semua' },
@@ -85,443 +52,259 @@ const categoryOptions: { value: ProjectCategory | ''; label: string }[] = [
 
 const semesterOptions: { value: string; label: string }[] = [
   { value: '', label: 'Semua' },
-  { value: '1', label: 'Semester 1' },
-  { value: '2', label: 'Semester 2' },
-  { value: '3', label: 'Semester 3' },
-  { value: '4', label: 'Semester 4' },
-  { value: '5', label: 'Semester 5' },
-  { value: '6', label: 'Semester 6' },
-  { value: '7', label: 'Semester 7' },
-  { value: '8', label: 'Semester 8' },
+  ...Array.from({ length: 8 }, (_, i) => ({ value: `${i + 1}`, label: `Semester ${i + 1}` })),
 ];
-
-interface FilterForm {
-  semester: string;
-  category: ProjectCategory | '';
-}
-
-interface ProjectForm {
-  file?: File;
-  name: string;
-  category: string;
-  semester?: number;
-}
-
-interface UploadState {
-  fileName: string;
-  progress: number;
-  error?: string;
-  uploadId: string;
-  abortController: AbortController;
-}
 
 export default function Project() {
   const { hasPermission } = usePermissions();
+  const { projects, pagination, loadProjects, deleteExistingProject } = useProject();
+
   const [search, setSearch] = useState('');
-  const [projects, setProjects] = useState<ProjectListItem[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total_items: 0, total_pages: 0 });
+  const [category, setCategory] = useState<ProjectCategory | ''>('');
+  const [semester, setSemester] = useState('');
+  const [pendingCategory, setPendingCategory] = useState<ProjectCategory | ''>('');
+  const [pendingSemester, setPendingSemester] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<ProjectListItem | null>(null);
-  const [uploadStates, setUploadStates] = useState<Map<string, UploadState>>(new Map());
-  const [isEditLoading, setIsEditLoading] = useState(false);
-  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [editingItem, setEditingItem] = useState<ProjectListItem | null>(null);
-  const [isCreateMode, setIsCreateMode] = useState(false);
-
-  const [pendingSemester, setPendingSemester] = useState<string>('');
-  const [pendingCategory, setPendingCategory] = useState<ProjectCategory | ''>('');
-
-  const filterForm = useForm<FilterForm>({
-    defaultValues: {
-      semester: '',
-      category: '',
-    },
-  });
-
-  const createForm = useForm<ProjectForm>({
-    defaultValues: {
-      file: undefined,
-      name: '',
-      category: '',
-      semester: undefined,
-    },
-  });
-
-  const editForm = useForm<ProjectForm>({
-    defaultValues: {
-      file: undefined,
-      name: '',
-      category: '',
-      semester: undefined,
-    },
-  });
-
-  const semester = useWatch({
-    control: filterForm.control,
-    name: 'semester',
-  });
-
-  const category = useWatch({
-    control: filterForm.control,
-    name: 'category',
-  });
+  const [uploadStates, setUploadStates] = useState<FileUploadState[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
 
   const debouncedSearch = useDebounce(search, 500);
 
-  const columns: ColumnDef<ProjectListItem>[] = [
-    {
-      accessorKey: 'nama_project',
-      header: () => (
-        <div className="text-left">Nama Project</div>
-      ),
-      cell: ({ getValue }) => (
-        <div className="text-left">{getValue<string>()}</div>
-      ),
-    },
-    {
-      accessorKey: 'kategori',
-      header: () => (
-        <div className="text-left">Kategori</div>
-      ),
-      cell: ({ getValue }) => {
-        const cat = getValue<ProjectCategory>();
-        return <div className="text-left">{categoryOptions.find(c => c.value === cat)?.label || cat}</div>;
-      },
-    },
-    {
-      accessorKey: 'ukuran',
-      header: () => (
-        <div className="text-center">Ukuran</div>
-      ),
-      cell: ({ getValue }) => (
-        <div className="text-center">{getValue<string>()}</div>
-      ),
-    },
-    {
-      accessorKey: 'terakhir_diperbarui',
-      header: () => (
-        <div className="text-center">Tanggal Diperbarui</div>
-      ),
-      cell: ({ getValue }) => (
-        <div className="text-center">{formatDate(new Date(getValue<string>()))}</div>
-      ),
-    },
-    {
-      id: 'actions',
-      header: () => (
-        <div className="text-center">Aksi</div>
-      ),
-      cell: ({ row }) => (
-        <div className="flex justify-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDownload(row.original)}
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-          {hasPermission('Project', 'update') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openEditDialog(row.original)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-          )}
-          {hasPermission('Project', 'delete') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openDeleteDialog(row.original)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
+  useEffect(() => {
+    const handleOpenUpload = () => setIsCreateOpen(true);
+    window.addEventListener('open-project-upload', handleOpenUpload);
+    return () => window.removeEventListener('open-project-upload', handleOpenUpload);
+  }, []);
 
-  const table = useReactTable({
-    data: projects,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    manualPagination: true,
-    pageCount: pagination.total_pages,
-  });
+  useEffect(() => {
+    const params: {
+      search?: string;
+      filter_kategori?: string;
+      filter_semester?: number;
+      page?: number;
+      limit?: number;
+    } = {
+      page: pagination?.page || 1,
+      limit: pagination?.limit || 10,
+    };
 
-  const fetchProjects = useCallback(async (pageIndex = 0, pageSize = 10) => {
-    try {
-      const params: {
-        search?: string;
-        filter_semester?: number;
-        filter_kategori?: string;
-        page?: number;
-        limit?: number;
-      } = {
-        page: pageIndex + 1,
-        limit: pageSize,
-      };
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (category) params.filter_kategori = category;
+    if (semester) params.filter_semester = parseInt(semester);
 
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (semester && semester !== '') params.filter_semester = parseInt(semester);
-      if (category) params.filter_kategori = category;
-
-      const response = await projectAPI.getProjects(params);
-      setProjects(response.data.items || []);
-      setPagination(response.data.pagination);
-    } catch (error) {
-      const err = error as ErrorResponse | ValidationErrorResponse;
-      toast.error(err.message || 'Gagal memuat data project');
-    }
-  }, [debouncedSearch, semester, category]);
+    loadProjects(params);
+  }, [debouncedSearch, category, semester, pagination?.page, pagination?.limit, loadProjects]);
 
   const handleApplyFilter = () => {
-    filterForm.setValue('semester', pendingSemester);
-    filterForm.setValue('category', pendingCategory);
+    setCategory(pendingCategory);
+    setSemester(pendingSemester);
     setFilterOpen(false);
+    setMobileFilterOpen(false);
   };
 
   const handleResetFilter = () => {
-    setPendingSemester('');
     setPendingCategory('');
-    filterForm.setValue('semester', '');
-    filterForm.setValue('category', '');
+    setPendingSemester('');
+    setCategory('');
+    setSemester('');
   };
 
-  const handleUploadProgress = (fileId: string, progress: UploadProgress) => {
-    setUploadStates(prev => {
-      const newStates = new Map(prev);
-      const state = newStates.get(fileId);
-      if (state) {
-        newStates.set(fileId, {
-          ...state,
-          progress: progress.percentage,
-        });
-      }
-      return newStates;
-    });
-  };
-
-  const handleUploadSuccess = (fileId: string) => {
-    setUploadStates(prev => {
-      const newStates = new Map(prev);
-      newStates.delete(fileId);
-      return newStates;
-    });
-  };
-
-  const handleUploadError = (fileId: string, error: Error) => {
-    setUploadStates(prev => {
-      const newStates = new Map(prev);
-      const state = newStates.get(fileId);
-      if (state) {
-        newStates.set(fileId, {
-          ...state,
-          error: error.message,
-        });
-      }
-      return newStates;
-    });
-    toast.error(`Gagal mengupload: ${error.message}`);
-  };
-
-  const cancelUpload = async (fileId: string) => {
-    const state = uploadStates.get(fileId);
-    if (state) {
-      state.abortController.abort();
-      await projectAPI.cancelUpload(state.uploadId);
-      setUploadStates(prev => {
-        const newStates = new Map(prev);
-        newStates.delete(fileId);
-        return newStates;
-      });
-      toast.info('Upload dibatalkan');
-    }
-  };
-
-  const handleCreate = createForm.handleSubmit(async (data) => {
-    if (!data.file || !data.name || !data.semester || !data.category) {
-      toast.error('Harap lengkapi semua field');
+  const handleUpload = async (data: { files: { file?: File; name: string; category?: ProjectCategory; semester?: number }[] }) => {
+    const files = data.files.filter(f => f.file && f.name && f.category && f.semester);
+    if (files.length === 0) {
+      toast.error('Harap lengkapi nama project, kategori, dan semester');
       return;
     }
 
-    const fileId = `${Date.now()}-${data.file.name}`;
-
-    try {
-      toast.info(`Menunggu slot upload untuk ${data.file.name}...`);
-
-      const activeUpload = await projectAPI.pollAndUploadWithChunks(
-        data.file,
-        {
-          nama_project: data.name,
-          kategori: data.category,
-          semester: data.semester.toString(),
-          filename: data.file.name,
-          filetype: data.file.type || 'application/zip',
-        },
-        {
-          onProgress: (progress) => handleUploadProgress(fileId, progress),
-          onSuccess: () => {
-            handleUploadSuccess(fileId);
-            fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
-          },
-          onError: (error) => handleUploadError(fileId, error),
-        }
-      );
-
-      setUploadStates(prev => new Map([...prev, [fileId, {
-        fileName: data.file!.name,
-        progress: 0,
-        uploadId: activeUpload.uploadId,
-        abortController: activeUpload.abortController,
-      }]]));
-
-      setIsCreateOpen(false);
-      createForm.reset();
-      toast.success('Upload dimulai');
-    } catch (error) {
-      const err = error as Error;
-      toast.error(`${data.file.name}: ${err.message}`);
+    if (files.length > 5) {
+      toast.error('Maksimal 5 file per upload');
+      return;
     }
-  });
 
-  const hasMetadataChanged = (data: { name: string; category: string; semester?: number }): boolean => {
-    if (!editingItem) return false;
+    for (const fileData of files) {
+      if (fileData.file) {
+        const validation = projectAPI.validateProjectFile(fileData.file);
+        if (!validation.valid) {
+          toast.error(`${fileData.file.name}: ${validation.error}`);
+          return;
+        }
+      }
+    }
 
-    return (
-      data.name !== editingItem.nama_project ||
-      data.category !== editingItem.kategori ||
-      data.semester !== editingItem.semester
-    );
+    setIsUploading(true);
+    const initialStates: FileUploadState[] = files.map((f, i) => ({
+      index: i,
+      fileName: f.file!.name,
+      progress: 0,
+      status: 'waiting',
+    }));
+    setUploadStates(initialStates);
+
+    let completedCount = 0;
+    let hasError = false;
+
+    for (let i = 0; i < files.length; i++) {
+      const fileData = files[i];
+      if (!fileData.file || !fileData.category || !fileData.semester) continue;
+
+      try {
+        setUploadStates(prev => prev.map(state =>
+          state.index === i ? { ...state, status: 'waiting' } : state
+        ));
+
+        toast.info(`Menunggu slot upload untuk ${fileData.file.name}...`);
+
+        await projectAPI.pollAndUploadProjectWithChunks(
+          fileData.file,
+          {
+            nama_project: fileData.name,
+            kategori: fileData.category,
+            semester: fileData.semester,
+            filename: fileData.file.name,
+            filetype: fileData.file.type,
+          },
+          {
+            onProgress: (progress) => {
+              setUploadStates(prev => prev.map(state =>
+                state.index === i ? { ...state, progress: progress.percentage, status: 'uploading' } : state
+              ));
+            },
+            onSuccess: () => {
+              setUploadStates(prev => prev.map(state =>
+                state.index === i ? { ...state, progress: 100, status: 'completed' } : state
+              ));
+              completedCount++;
+            },
+            onError: (error) => {
+              setUploadStates(prev => prev.map(state =>
+                state.index === i ? { ...state, status: 'error', error: error.message } : state
+              ));
+              toast.error(`${fileData.file!.name}: ${error.message}`);
+              hasError = true;
+            },
+          }
+        );
+      } catch (error) {
+        const err = error as ErrorResponse | ValidationErrorResponse;
+        setUploadStates(prev => prev.map(state =>
+          state.index === i ? { ...state, status: 'error', error: err.message } : state
+        ));
+        hasError = true;
+      }
+    }
+
+    setIsUploading(false);
+    
+    if (!hasError) {
+      setTimeout(() => {
+        setUploadStates([]);
+        setIsCreateOpen(false);
+        toast.success(`${completedCount} project berhasil diupload`);
+        loadProjects();
+      }, 1000);
+    }
   };
 
-  const handleEdit = editForm.handleSubmit(async (data) => {
+  const handleEdit = async (data: { files: { file?: File; name: string; category?: ProjectCategory; semester?: number; existingFileSize?: string }[] }) => {
     if (!editingItem) return;
 
+    const fileData = data.files[0];
+    if (!fileData) return;
+
+    setIsEditLoading(true);
+
     try {
-      setIsEditLoading(true);
-
-      if (!data.name || !data.semester || !data.category) {
-        toast.error('Harap lengkapi semua field');
-        return;
-      }
-
-      const isNewFileUploaded = data.file && data.file.size > 0;
-      const metadataChanged = hasMetadataChanged(data);
-
-      if (!isNewFileUploaded && !metadataChanged) {
-        toast.info('Tidak ada perubahan yang disimpan');
-        return;
-      }
+      const isNewFileUploaded = fileData.file && fileData.file.size > 0;
+      const metadataChanged = fileData.name !== editingItem.nama_project || 
+                             fileData.category !== editingItem.kategori || 
+                             fileData.semester !== editingItem.semester;
 
       if (!isNewFileUploaded && metadataChanged) {
         await projectAPI.updateProjectMetadata(editingItem.id, {
-          nama_project: data.name,
-          kategori: data.category,
-          semester: data.semester,
+          nama_project: fileData.name,
+          kategori: fileData.category!,
+          semester: fileData.semester!,
         });
-
+        toast.success('Metadata project berhasil diperbarui');
         setIsEditOpen(false);
         setEditingItem(null);
-        editForm.reset();
-        toast.success('Metadata project berhasil diperbarui');
-        fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
-        return;
-      }
+        loadProjects();
+      } else if (isNewFileUploaded) {
+        if (!fileData.category || !fileData.semester) {
+          toast.error('Harap lengkapi kategori dan semester');
+          return;
+        }
 
-      if (isNewFileUploaded) {
+        setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 0, status: 'waiting' }]);
 
-        const fileId = `${Date.now()}-${data.file!.name}`;
+        toast.info(`Menunggu slot upload untuk ${fileData.file!.name}...`);
 
-        try {
-          toast.info(`Menunggu slot upload untuk update ${data.file!.name}...`);
-
-          const activeUpload = await projectAPI.pollAndUpdateProjectWithChunks(
-            editingItem.id,
-            data.file!,
-            {
-              nama_project: data.name,
-              kategori: data.category,
-              semester: data.semester.toString(),
-              filename: data.file!.name,
-              filetype: data.file!.type || 'application/zip',
+        await projectAPI.pollAndUpdateProjectWithChunks(
+          editingItem.id,
+          fileData.file!,
+          {
+            nama_project: fileData.name,
+            kategori: fileData.category,
+            semester: fileData.semester,
+            filename: fileData.file!.name,
+            filetype: fileData.file!.type,
+          },
+          {
+            onProgress: (progress) => {
+              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: progress.percentage, status: 'uploading' }]);
             },
-            {
-              onProgress: (progress) => handleUploadProgress(fileId, progress),
-              onSuccess: () => {
-                handleUploadSuccess(fileId);
-                fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
+            onSuccess: () => {
+              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 100, status: 'completed' }]);
+              setTimeout(() => {
+                setUploadStates([]);
                 setIsEditOpen(false);
                 setEditingItem(null);
-                editForm.reset();
                 toast.success('Project berhasil diperbarui');
-              },
-              onError: (error) => handleUploadError(fileId, error),
+                loadProjects();
+              }, 1000);
             },
-            metadataChanged
-          );
-
-          setUploadStates(prev => new Map([...prev, [fileId, {
-            fileName: data.file!.name,
-            progress: 0,
-            uploadId: activeUpload.uploadId,
-            abortController: activeUpload.abortController,
-          }]]));
-
-          toast.success('Update dimulai');
-        } catch (error) {
-          const err = error as Error;
-          toast.error(err.message);
-        }
+            onError: (error) => {
+              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 0, status: 'error', error: error.message }]);
+              toast.error(error.message);
+            },
+          }
+        );
       }
     } catch (error) {
-      const err = error as ErrorResponse | ValidationErrorResponse | Error;
-
-      if ('errors' in err && err.errors) {
-        (err.errors as import('@/types').ValidationError[]).forEach((e) => toast.error(e.message));
-      } else if ('message' in err) {
-        toast.error(err.message || 'Gagal memperbarui project');
-      } else {
-        toast.error('Gagal memperbarui project');
-      }
+      const err = error as ErrorResponse | ValidationErrorResponse;
+      toast.error(err.message || 'Gagal memperbarui project');
     } finally {
       setIsEditLoading(false);
     }
-  });
+  };
 
   const handleDelete = async () => {
     if (!deletingItem) return;
 
-    try {
-      setIsDeleteLoading(true);
-      await projectAPI.deleteProject(deletingItem.id);
+    const result = await deleteExistingProject(deletingItem.id);
+    if (result.success) {
       setIsDeleteOpen(false);
       setDeletingItem(null);
       toast.success('Project berhasil dihapus');
-      fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
-    } catch (error) {
-      const err = error as ErrorResponse | ValidationErrorResponse;
-      toast.error(err.message || 'Gagal menghapus project');
-    } finally {
-      setIsDeleteLoading(false);
+    } else {
+      toast.error(result.error || 'Gagal menghapus project');
     }
   };
 
   const handleDownload = async (item: ProjectListItem) => {
     try {
-      const blob = await projectAPI.downloadProjects([item.id]);
-      const url = window.URL.createObjectURL(blob);
+      const result = await projectAPI.downloadProjects([item.id]);
+      const url = window.URL.createObjectURL(result.blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${item.nama_project}.zip`;
+      a.download = result.filename || item.nama_project;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -533,32 +316,65 @@ export default function Project() {
     }
   };
 
-  const openEditDialog = (item: ProjectListItem) => {
-    setEditingItem(item);
-    setIsCreateMode(false);
-    editForm.setValue('file', undefined);
-    editForm.setValue('name', item.nama_project);
-    editForm.setValue('category', item.kategori);
-    editForm.setValue('semester', item.semester);
-    setIsEditOpen(true);
-  };
+  const columns: ColumnDef<ProjectListItem>[] = [
+    {
+      accessorKey: 'nama_project',
+      header: 'Nama Project',
+    },
+    {
+      accessorKey: 'kategori',
+      header: 'Kategori',
+      cell: ({ getValue }) => {
+        const kategori = getValue<ProjectCategory>();
+        return categoryOptions.find(option => option.value === kategori)?.label || kategori;
+      },
+    },
+    {
+      accessorKey: 'semester',
+      header: 'Semester',
+      cell: ({ getValue }) => `Semester ${getValue<number>()}`,
+    },
+    {
+      accessorKey: 'ukuran',
+      header: 'Ukuran',
+    },
+    {
+      accessorKey: 'terakhir_diperbarui',
+      header: 'Terakhir Diperbarui',
+      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
+    },
+    {
+      id: 'actions',
+      header: 'Aksi',
+      cell: ({ row }) => (
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => handleDownload(row.original)}>
+            <Download className="h-4 w-4" />
+          </Button>
+          {hasPermission('Project', 'update') && (
+            <Button variant="ghost" size="sm" onClick={() => { setEditingItem(row.original); setIsEditOpen(true); }}>
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
+          {hasPermission('Project', 'delete') && (
+            <Button variant="ghost" size="sm" onClick={() => { setDeletingItem(row.original); setIsDeleteOpen(true); }}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
-  const getExistingFileInfo = () => {
-    if (!editingItem || isCreateMode) return null;
-    return {
-      name: editingItem.nama_project,
-      size: editingItem.ukuran
-    };
-  };
-
-  const openDeleteDialog = (item: ProjectListItem) => {
-    setDeletingItem(item);
-    setIsDeleteOpen(true);
-  };
-
-  useEffect(() => {
-    fetchProjects(table.getState().pagination.pageIndex, table.getState().pagination.pageSize);
-  }, [fetchProjects, table]);
+  const table = useReactTable({
+    data: projects || [],
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: pagination?.total_pages || 0,
+  });
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -572,140 +388,27 @@ export default function Project() {
             className="pl-9"
           />
         </div>
-        <DropdownMenu open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="relative">
-              <Filter className="h-4 w-4" />
-              {(semester || category) && (
-                <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                  {(semester ? 1 : 0) + (category ? 1 : 0)}
-                </Badge>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-80">
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <Label>Semester</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {pendingSemester
-                        ? semesterOptions.find(option => option.value === pendingSemester)?.label
-                        : "Pilih semester"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Cari semester..." />
-                      <CommandList>
-                        <CommandEmpty>Tidak ada semester ditemukan.</CommandEmpty>
-                        <CommandGroup>
-                          {semesterOptions.map((option) => (
-                            <CommandItem
-                              key={option.value}
-                              value={option.value}
-                              onSelect={() => {
-                                setPendingSemester(option.value === pendingSemester ? '' : option.value);
-                              }}
-                            >
-                              {option.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label>Kategori</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {pendingCategory
-                        ? categoryOptions.find(option => option.value === pendingCategory)?.label
-                        : "Pilih kategori"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Cari kategori..." />
-                      <CommandList>
-                        <CommandEmpty>Tidak ada kategori ditemukan.</CommandEmpty>
-                        <CommandGroup>
-                          {categoryOptions.map((option) => (
-                            <CommandItem
-                              key={option.value}
-                              value={option.value}
-                              onSelect={() => {
-                                setPendingCategory(option.value === pendingCategory ? '' : option.value);
-                              }}
-                            >
-                              {option.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={() => { handleApplyFilter(); setMobileFilterOpen(false); }} className="flex-1">
-                  Terapkan
-                </Button>
-                <Button variant="outline" onClick={() => { handleResetFilter(); setMobileFilterOpen(false); }} className="flex-1">
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ProjectFilterDialog
+          open={mobileFilterOpen}
+          onOpenChange={setMobileFilterOpen}
+          pendingCategory={pendingCategory}
+          pendingSemester={pendingSemester}
+          onCategoryChange={setPendingCategory}
+          onSemesterChange={setPendingSemester}
+          onApply={handleApplyFilter}
+          onReset={handleResetFilter}
+          category={category}
+          semester={semester}
+          categoryOptions={categoryOptions}
+          semesterOptions={semesterOptions}
+          isMobile
+        />
         {hasPermission('Project', 'create') && (
-          <Button onClick={() => {
-            setIsCreateMode(true);
-            setIsCreateOpen(true);
-          }} size="icon">
+          <Button onClick={() => setIsCreateOpen(true)} size="icon">
             <Upload className="h-4 w-4" />
           </Button>
         )}
       </div>
-
-      {uploadStates.size > 0 && (
-        <div className="space-y-2 p-4 border rounded-lg">
-          <h3 className="text-sm font-medium">Upload Progress</h3>
-          {Array.from(uploadStates.entries()).map(([fileId, state]) => (
-            <div key={fileId} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm truncate flex-1">{state.fileName}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{state.progress}%</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => cancelUpload(fileId)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <Progress value={state.progress} />
-              {state.error && (
-                <p className="text-sm text-destructive">{state.error}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
 
       <div className="rounded-md border">
         <Table>
@@ -715,7 +418,7 @@ export default function Project() {
                 <div className="flex items-center justify-between py-3">
                   <div>
                     <h3 className="text-base font-medium">Project</h3>
-                    <p className="text-xs text-muted-foreground">Kelola Project anda</p>
+                    <p className="text-xs text-muted-foreground">Kelola project mahasiswa</p>
                   </div>
                   <div className="hidden md:flex items-center gap-4">
                     <div className="relative min-w-0 max-w-sm">
@@ -727,109 +430,22 @@ export default function Project() {
                         className="pl-9"
                       />
                     </div>
-                    <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="relative">
-                          <Filter className="h-4 w-4" />
-                          {(semester || category) && (
-                            <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                              {(semester ? 1 : 0) + (category ? 1 : 0)}
-                            </Badge>
-                          )}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-80">
-                        <div className="p-4 space-y-4">
-                          <div className="space-y-2">
-                            <Label>Semester</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className="w-full justify-between"
-                                >
-                                  {pendingSemester
-                                    ? semesterOptions.find(option => option.value === pendingSemester)?.label
-                                    : "Pilih semester"}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-full p-0">
-                                <Command>
-                                  <CommandInput placeholder="Cari semester..." />
-                                  <CommandList>
-                                    <CommandEmpty>Tidak ada semester ditemukan.</CommandEmpty>
-                                    <CommandGroup>
-                                      {semesterOptions.map((option) => (
-                                        <CommandItem
-                                          key={option.value}
-                                          value={option.value}
-                                          onSelect={() => {
-                                            setPendingSemester(option.value === pendingSemester ? '' : option.value);
-                                          }}
-                                        >
-                                          {option.label}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Kategori</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className="w-full justify-between"
-                                >
-                                  {pendingCategory
-                                    ? categoryOptions.find(option => option.value === pendingCategory)?.label
-                                    : "Pilih kategori"}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-full p-0">
-                                <Command>
-                                  <CommandInput placeholder="Cari kategori..." />
-                                  <CommandList>
-                                    <CommandEmpty>Tidak ada kategori ditemukan.</CommandEmpty>
-                                    <CommandGroup>
-                                      {categoryOptions.map((option) => (
-                                        <CommandItem
-                                          key={option.value}
-                                          value={option.value}
-                                          onSelect={() => {
-                                            setPendingCategory(option.value === pendingCategory ? '' : option.value);
-                                          }}
-                                        >
-                                          {option.label}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button onClick={handleApplyFilter} className="flex-1">
-                              Terapkan
-                            </Button>
-                            <Button variant="outline" onClick={handleResetFilter} className="flex-1">
-                              Reset
-                            </Button>
-                          </div>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ProjectFilterDialog
+                      open={filterOpen}
+                      onOpenChange={setFilterOpen}
+                      pendingCategory={pendingCategory}
+                      pendingSemester={pendingSemester}
+                      onCategoryChange={setPendingCategory}
+                      onSemesterChange={setPendingSemester}
+                      onApply={handleApplyFilter}
+                      onReset={handleResetFilter}
+                      category={category}
+                      semester={semester}
+                      categoryOptions={categoryOptions}
+                      semesterOptions={semesterOptions}
+                    />
                     {hasPermission('Project', 'create') && (
-                      <Button onClick={() => {
-                        setIsCreateMode(true);
-                        setIsCreateOpen(true);
-                      }} size="icon">
+                      <Button onClick={() => setIsCreateOpen(true)} size="icon">
                         <Upload className="h-4 w-4" />
                       </Button>
                     )}
@@ -841,9 +457,7 @@ export default function Project() {
               <TableRow key={headerGroup.id} className="bg-muted/50">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
@@ -863,10 +477,7 @@ export default function Project() {
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="p-0 border-0">
-                  <EmptyState
-                    title="Belum ada project"
-                    description="Silahkan upload project pertama anda"
-                  />
+                  <EmptyState title="Belum ada project" description="Belum ada project yang diupload" />
                 </TableCell>
               </TableRow>
             )}
@@ -876,36 +487,35 @@ export default function Project() {
               <TableCell colSpan={columns.length} className="text-center">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    Menampilkan {table.getFilteredRowModel().rows.length} dari {pagination.total_items} data
+                    Menampilkan {projects?.length || 0} dari {pagination?.total_items || 0} data
                   </div>
-                  <div className="space-x-2">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            onClick={() => table.previousPage()}
-                            className={table.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
-                          />
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => table.previousPage()}
+                          className={table.getCanPreviousPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                        />
+                      </PaginationItem>
+                      {pagination && pagination.total_pages > 0 && Array.from({ length: pagination.total_pages }, (_, i) => i + 1).map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => loadProjects({ page, limit: pagination.limit })}
+                            isActive={pagination.page === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
                         </PaginationItem>
-                        {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map((page) => (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => table.setPageIndex(page - 1)}
-                              isActive={table.getState().pagination.pageIndex === page - 1}
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext
-                            onClick={() => table.nextPage()}
-                            className={table.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </div>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => table.nextPage()}
+                          className={table.getCanNextPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
               </TableCell>
             </TableRow>
@@ -913,333 +523,30 @@ export default function Project() {
         </Table>
       </div>
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Upload Project</DialogTitle>
-          </DialogHeader>
-          <Form {...createForm}>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Format file harus berupa ZIP
-                </AlertDescription>
-              </Alert>
-              <div className="space-y-4">
-                <FormField
-                  control={createForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nama Project</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nama project" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={createForm.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Kategori</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Pilih kategori" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categoryOptions.filter(option => option.value !== '').map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={createForm.control}
-                    name="semester"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Semester</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Pilih semester" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Array.from({ length: 8 }, (_, i) => i + 1).map((semester) => (
-                              <SelectItem key={semester} value={semester.toString()}>
-                                Semester {semester}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={createForm.control}
-                  name="file"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>File Project</FormLabel>
-                      <FormControl>
-                        <Card
-                          className={`border-2 border-dashed transition-colors cursor-pointer ${
-                            field.value ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
-                          }`}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            const files = Array.from(e.dataTransfer.files);
-                            if (files.length > 0) {
-                              field.onChange(files[0]);
-                            }
-                          }}
-                          onDragOver={(e) => e.preventDefault()}
-                          onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = '.zip';
-                            input.onchange = (e) => {
-                              const files = (e.target as HTMLInputElement).files;
-                              if (files && files.length > 0) {
-                                field.onChange(files[0]);
-                              }
-                            };
-                            input.click();
-                          }}
-                        >
-                          <CardContent className="p-8">
-                            <div className="text-center">
-                              {field.value ? (
-                                <>
-                                  <File className="mx-auto h-12 w-12 text-primary mb-4" />
-                                  <p className="text-sm font-medium text-primary">{field.value.name}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    {(field.value.size / 1024 / 1024).toFixed(2)} MB
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-4">
-                                    Klik untuk mengganti file atau seret file baru
-                                  </p>
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                                  <p className="text-sm font-medium">
-                                    Upload File Project
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    Seret dan jatuhkan file ZIP di sini, atau klik untuk memilih
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Maksimal 500MB
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" disabled={uploadStates.size > 0}>
-                  {uploadStates.size > 0 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Upload
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <ProjectUploadDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSubmit={handleUpload}
+        uploadStates={uploadStates}
+        isUploading={isUploading}
+        categoryOptions={categoryOptions}
+      />
 
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-          </DialogHeader>
-          <Form {...editForm}>
-            <form onSubmit={handleEdit} className="space-y-4">
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Format file harus berupa ZIP
-                </AlertDescription>
-              </Alert>
-              <div className="space-y-4">
-                <FormField
-                  control={editForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nama Project</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nama project" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={editForm.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Kategori</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Pilih kategori" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categoryOptions.filter(option => option.value !== '').map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="semester"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Semester</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Pilih semester" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Array.from({ length: 8 }, (_, i) => i + 1).map((semester) => (
-                              <SelectItem key={semester} value={semester.toString()}>
-                                Semester {semester}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={editForm.control}
-                  name="file"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>File Project (Opsional)</FormLabel>
-                      <FormControl>
-                        <Card
-                          className={`border-2 border-dashed transition-colors cursor-pointer ${
-                            field.value ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
-                          }`}
-                          onDrop={(e: React.DragEvent) => {
-                            e.preventDefault();
-                            const files = Array.from(e.dataTransfer.files);
-                            if (files.length > 0) {
-                              field.onChange(files[0]);
-                            }
-                          }}
-                          onDragOver={(e: React.DragEvent) => e.preventDefault()}
-                          onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = '.zip';
-                            input.onchange = (e: Event) => {
-                              const files = (e.target as HTMLInputElement).files;
-                              if (files && files.length > 0) {
-                                field.onChange(files[0]);
-                              }
-                            };
-                            input.click();
-                          }}
-                        >
-                          <CardContent className="p-8">
-                            <div className="text-center">
-                              {field.value ? (
-                                <>
-                                  <File className="mx-auto h-12 w-12 text-primary mb-4" />
-                                  <p className="text-sm font-medium text-primary">{field.value.name}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    {(field.value.size / 1024 / 1024).toFixed(2)} MB
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-4">
-                                    Klik untuk mengganti file atau seret file baru
-                                  </p>
-                                </>
-                              ) : getExistingFileInfo() ? (
-                                <>
-                                  <File className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                                  <p className="text-sm font-medium">{getExistingFileInfo()!.name}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    {getExistingFileInfo()!.size}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-4">
-                                    Klik untuk mengganti file atau seret file baru
-                                  </p>
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                                  <p className="text-sm font-medium">
-                                    Upload File Project Baru (Opsional)
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    Seret dan jatuhkan file ZIP di sini, atau klik untuk memilih
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Maksimal 500MB
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" disabled={isEditLoading}>
-                  {isEditLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Simpan
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <ProjectEditDialog
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        onSubmit={handleEdit}
+        editingItem={editingItem}
+        uploadStates={uploadStates}
+        isLoading={isEditLoading}
+        categoryOptions={categoryOptions}
+      />
 
       <DeleteConfirmation
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         onConfirm={handleDelete}
         itemName={deletingItem?.nama_project}
-        loading={isDeleteLoading}
       />
     </div>
   );

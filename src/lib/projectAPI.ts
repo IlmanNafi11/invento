@@ -1,75 +1,259 @@
+import { APIClient } from './apiClient';
+import {
+  TUSUploadManager,
+  type TUSUploadOptions,
+  TUSClient,
+  type TUSSlotInfo,
+  TUSMetadataValidator,
+  type ProjectMetadata,
+  TUSErrorHandler,
+  TUSErrorType,
+} from './tus';
 import type {
   ProjectListResponse,
   SuccessResponse,
-  ErrorResponse,
-  ValidationErrorResponse,
-  UploadInfoResponse,
-  UploadSlotResponse,
   ProjectUpdateMetadataRequest,
   ProjectUpdateMetadataResponse,
 } from '@/types';
-import { tusHelper, type ProjectUploadMetadata, type UploadCallbacks, type ActiveUpload } from './tusHelper';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+export interface ProjectUploadCallbacks {
+  onProgress: (progress: { percentage: number; bytesUploaded: number; bytesTotal: number; speed: number; eta: number }) => void;
+  onSuccess: () => void;
+  onError: (error: { message: string }) => void;
+}
 
-class ProjectAPIClient {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token');
-    return {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
+class ProjectAPIClient extends APIClient {
+  private tusUploadManager: TUSUploadManager;
+  private tusClient: TUSClient;
+
+  constructor() {
+    super();
+    this.tusUploadManager = new TUSUploadManager();
+    this.tusClient = new TUSClient();
   }
 
+  validateProjectFile(file: File): { valid: boolean; error?: string } {
+    const MAX_FILE_SIZE = 500 * 1024 * 1024;
+    const ALLOWED_TYPES = ['zip'];
 
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
-
-    const response = await fetch(url, {
-      headers: this.getAuthHeaders(),
-      ...options,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw data as ErrorResponse | ValidationErrorResponse;
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: 'Ukuran file project tidak boleh lebih dari 500MB',
+      };
     }
 
-    return data as T;
+    if (file.size === 0) {
+      return {
+        valid: false,
+        error: 'File tidak boleh kosong',
+      };
+    }
+
+    const fileExt = file.name.toLowerCase().split('.').pop() || '';
+    if (!ALLOWED_TYPES.includes(fileExt)) {
+      return {
+        valid: false,
+        error: 'Format file harus ZIP',
+      };
+    }
+
+    return { valid: true };
   }
 
-  private buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        searchParams.append(key, String(value));
+  validateProjectMetadata(metadata: Partial<ProjectMetadata>): { valid: boolean; errors?: string[] } {
+    const errors = TUSMetadataValidator.validateProjectMetadata(metadata);
+    
+    if (errors.length > 0) {
+      return {
+        valid: false,
+        errors: errors.map(e => e.message),
+      };
+    }
+
+    return { valid: true };
+  }
+
+  async pollForAvailableSlot(maxWaitTimeMs = 30000, pollIntervalMs = 1000): Promise<TUSSlotInfo> {
+    try {
+      return await this.tusClient.pollForSlot(
+        '/project/upload/check-slot',
+        maxWaitTimeMs,
+        pollIntervalMs
+      );
+    } catch (error) {
+      const tusError = TUSErrorHandler.handleError(error);
+      if (tusError.type === TUSErrorType.QUEUE_FULL) {
+        throw new Error('Antrian penuh. Maksimal 5 file per user. Silakan tunggu upload selesai.');
       }
-    });
-    return searchParams.toString();
+      throw tusError;
+    }
   }
 
-  validateFileSize(file: File): boolean {
-    return tusHelper.validateFileSize(file);
+  async uploadProjectWithChunks(
+    file: File,
+    metadata: ProjectMetadata,
+    callbacks: ProjectUploadCallbacks
+  ): Promise<string> {
+    const validation = this.validateProjectFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    const metadataValidation = this.validateProjectMetadata(metadata);
+    if (!metadataValidation.valid) {
+      throw new Error(metadataValidation.errors?.join(', '));
+    }
+
+    const options: TUSUploadOptions = {
+      file,
+      endpoint: '/project/upload',
+      metadata,
+      metadataType: 'project',
+      checkSlot: true,
+      pollForSlot: false,
+      onProgress: (progress) => {
+        callbacks.onProgress({
+          percentage: progress.percentage,
+          bytesUploaded: progress.bytesUploaded,
+          bytesTotal: progress.bytesTotal,
+          speed: progress.speed || 0,
+          eta: progress.remainingTime || 0,
+        });
+      },
+      onSuccess: callbacks.onSuccess,
+      onError: (error) => callbacks.onError({ message: error.message }),
+    };
+
+    try {
+      return await this.tusUploadManager.startUpload(options);
+    } catch (error) {
+      const tusError = TUSErrorHandler.handleError(error);
+      callbacks.onError({ message: tusError.message });
+      throw tusError;
+    }
   }
 
-  validateFileType(file: File): boolean {
-    return tusHelper.validateFileType(file);
+  async pollAndUploadProjectWithChunks(
+    file: File,
+    metadata: ProjectMetadata,
+    callbacks: ProjectUploadCallbacks
+  ): Promise<string> {
+    const options: TUSUploadOptions = {
+      file,
+      endpoint: '/project/upload',
+      metadata,
+      metadataType: 'project',
+      checkSlot: true,
+      pollForSlot: true,
+      onProgress: (progress) => {
+        callbacks.onProgress({
+          percentage: progress.percentage,
+          bytesUploaded: progress.bytesUploaded,
+          bytesTotal: progress.bytesTotal,
+          speed: progress.speed || 0,
+          eta: progress.remainingTime || 0,
+        });
+      },
+      onSuccess: callbacks.onSuccess,
+      onError: (error) => callbacks.onError({ message: error.message }),
+    };
+
+    try {
+      return await this.tusUploadManager.startUpload(options);
+    } catch (error) {
+      const tusError = TUSErrorHandler.handleError(error);
+      callbacks.onError({ message: tusError.message });
+      throw tusError;
+    }
   }
 
-  async checkUploadSlot(): Promise<UploadSlotResponse> {
-    return tusHelper.checkUploadSlot();
+  async updateProjectWithChunks(
+    id: number,
+    file: File,
+    metadata: ProjectMetadata,
+    callbacks: ProjectUploadCallbacks
+  ): Promise<string> {
+    const validation = this.validateProjectFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    const metadataValidation = this.validateProjectMetadata(metadata);
+    if (!metadataValidation.valid) {
+      throw new Error(metadataValidation.errors?.join(', '));
+    }
+
+    const options: TUSUploadOptions = {
+      file,
+      endpoint: `/project/${id}/upload`,
+      metadata,
+      metadataType: 'project',
+      isUpdate: true,
+      resourceId: id,
+      checkSlot: true,
+      pollForSlot: false,
+      onProgress: (progress) => {
+        callbacks.onProgress({
+          percentage: progress.percentage,
+          bytesUploaded: progress.bytesUploaded,
+          bytesTotal: progress.bytesTotal,
+          speed: progress.speed || 0,
+          eta: progress.remainingTime || 0,
+        });
+      },
+      onSuccess: callbacks.onSuccess,
+      onError: (error) => callbacks.onError({ message: error.message }),
+    };
+
+    try {
+      return await this.tusUploadManager.startUpload(options);
+    } catch (error) {
+      const tusError = TUSErrorHandler.handleError(error);
+      callbacks.onError({ message: tusError.message });
+      throw tusError;
+    }
   }
 
-  async resetUploadQueue(): Promise<SuccessResponse> {
-    return tusHelper.resetUploadQueue();
+  async pollAndUpdateProjectWithChunks(
+    id: number,
+    file: File,
+    metadata: ProjectMetadata,
+    callbacks: ProjectUploadCallbacks
+  ): Promise<string> {
+    const options: TUSUploadOptions = {
+      file,
+      endpoint: `/project/${id}/upload`,
+      metadata,
+      metadataType: 'project',
+      isUpdate: true,
+      resourceId: id,
+      checkSlot: true,
+      pollForSlot: true,
+      onProgress: (progress) => {
+        callbacks.onProgress({
+          percentage: progress.percentage,
+          bytesUploaded: progress.bytesUploaded,
+          bytesTotal: progress.bytesTotal,
+          speed: progress.speed || 0,
+          eta: progress.remainingTime || 0,
+        });
+      },
+      onSuccess: callbacks.onSuccess,
+      onError: (error) => callbacks.onError({ message: error.message }),
+    };
+
+    try {
+      return await this.tusUploadManager.startUpload(options);
+    } catch (error) {
+      const tusError = TUSErrorHandler.handleError(error);
+      callbacks.onError({ message: tusError.message });
+      throw tusError;
+    }
   }
 
-  async checkUploadSlotWithRetry(maxRetries = 1): Promise<{ response: UploadSlotResponse; wasReset: boolean }> {
-    return tusHelper.checkUploadSlotWithRetry(maxRetries);
+  async cancelUpload(uploadId: string): Promise<void> {
+    await this.tusUploadManager.cancelUpload(uploadId);
   }
 
   async getProjects(params?: {
@@ -79,112 +263,19 @@ class ProjectAPIClient {
     page?: number;
     limit?: number;
   }): Promise<ProjectListResponse> {
-    const query = this.buildQueryString(params || {});
-    const endpoint = `/project${query ? `?${query}` : ''}`;
-    return this.request<ProjectListResponse>(endpoint);
-  }
-
-
-
-  async uploadWithChunks(
-    file: File,
-    metadata: ProjectUploadMetadata,
-    callbacks: UploadCallbacks
-  ): Promise<ActiveUpload> {
-    const uploadId = await tusHelper.startUpload(file, {
-      metadata,
-      callbacks,
-      isUpdate: false,
-      type: 'project'
-    });
-
-    const activeUpload = tusHelper.getActiveUpload(uploadId);
-    if (!activeUpload) {
-      throw new Error('Gagal memulai upload');
-    }
-
-    return activeUpload;
-  }
-
-  async pollAndUploadWithChunks(
-    file: File,
-    metadata: ProjectUploadMetadata,
-    callbacks: UploadCallbacks
-  ): Promise<ActiveUpload> {
-    await tusHelper.pollForAvailableSlot();
-    return this.uploadWithChunks(file, metadata, callbacks);
-  }
-
-  async updateProjectWithChunks(
-    id: number,
-    file: File,
-    metadata: ProjectUploadMetadata,
-    callbacks: UploadCallbacks,
-    hasMetadataChanged = false
-  ): Promise<ActiveUpload> {
-    const uploadId = await tusHelper.startUpload(file, {
-      metadata,
-      callbacks,
-      isUpdate: true,
-      projectId: id,
-      hasMetadataChanged,
-      type: 'project'
-    });
-
-    const activeUpload = tusHelper.getActiveUpload(uploadId);
-    if (!activeUpload) {
-      throw new Error('Gagal memulai update upload');
-    }
-
-    return activeUpload;
-  }
-
-  async pollAndUpdateProjectWithChunks(
-    id: number,
-    file: File,
-    metadata: ProjectUploadMetadata,
-    callbacks: UploadCallbacks,
-    hasMetadataChanged = false
-  ): Promise<ActiveUpload> {
-    await tusHelper.pollForAvailableSlot();
-    return this.updateProjectWithChunks(id, file, metadata, callbacks, hasMetadataChanged);
-  }
-
-
-
-
-
-  async cancelUpload(uploadId: string): Promise<void> {
-    return tusHelper.cancelUpload(uploadId);
-  }
-
-  async getUploadInfo(uploadId: string): Promise<UploadInfoResponse> {
-    return this.request<UploadInfoResponse>(`/project/upload/${uploadId}`);
-  }
-
-  async getUploadStatus(uploadUrl: string): Promise<{ offset: number; length: number }> {
-    return tusHelper.getUploadStatus(uploadUrl);
+    return this.get<ProjectListResponse>('/project', params);
   }
 
   async updateProjectMetadata(id: number, data: ProjectUpdateMetadataRequest): Promise<ProjectUpdateMetadataResponse> {
-    return this.request<ProjectUpdateMetadataResponse>(`/project/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders(),
-      },
-      body: JSON.stringify(data),
-    });
+    return this.patch<ProjectUpdateMetadataResponse>(`/project/${id}`, data);
   }
 
   async deleteProject(id: number): Promise<SuccessResponse> {
-    return this.request<SuccessResponse>(`/project/${id}`, {
-      method: 'DELETE',
-    });
+    return this.delete<SuccessResponse>(`/project/${id}`);
   }
 
-  async downloadProjects(ids: number[]): Promise<Blob> {
-    const response = await fetch(`${API_BASE_URL}/project/download`, {
+  async downloadProjects(ids: number[]): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${this.baseURL}/project/download`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -195,10 +286,16 @@ class ProjectAPIClient {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw errorData as ErrorResponse | ValidationErrorResponse;
+      throw errorData;
     }
 
-    return response.blob();
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('Content-Disposition');
+    const filename = contentDisposition
+      ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') || 'projects.zip'
+      : 'projects.zip';
+
+    return { blob, filename };
   }
 }
 

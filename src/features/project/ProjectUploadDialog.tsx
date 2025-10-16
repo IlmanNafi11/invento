@@ -9,30 +9,33 @@ import {
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
-import { ModulUploadProgress, type FileUploadState } from './ModulUploadProgress';
+import { ProjectUploadProgress, type FileUploadState } from './ProjectUploadProgress';
+import type { ProjectCategory } from '@/types';
 
-interface ModulForm {
-  files: { file?: File; name: string; semester?: number }[];
+interface ProjectForm {
+  files: { file?: File; name: string; category?: ProjectCategory; semester?: number }[];
 }
 
-interface ModulUploadDialogProps {
+interface ProjectUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: ModulForm) => Promise<void>;
+  onSubmit: (data: ProjectForm) => Promise<void>;
   uploadStates: FileUploadState[];
   isUploading: boolean;
+  categoryOptions: { value: ProjectCategory | ''; label: string }[];
 }
 
-export function ModulUploadDialog({
+export function ProjectUploadDialog({
   open,
   onOpenChange,
   onSubmit,
   uploadStates,
   isUploading,
-}: ModulUploadDialogProps) {
-  const form = useForm<ModulForm>({
+  categoryOptions,
+}: ProjectUploadDialogProps) {
+  const form = useForm<ProjectForm>({
     defaultValues: {
-      files: [{ file: undefined, name: '', semester: undefined }],
+      files: [{ file: undefined, name: '', category: undefined, semester: undefined }],
     },
   });
 
@@ -56,26 +59,27 @@ export function ModulUploadDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="!max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Upload Modul</DialogTitle>
+          <DialogTitle>Upload Project</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={handleSubmit} className="space-y-6">
             <FileInput
-              label="File Modul"
-              accept=".docx,.xlsx,.pdf,.pptx"
-              onChange={(files) => form.setValue('files', files)}
+              label="File Project"
+              accept=".zip"
+              multiple={false}
+              onChange={(files) => form.setValue('files', files as { file?: File; name: string; category?: ProjectCategory; semester?: number }[])}
               value={form.watch('files')}
-              showCategory={false}
+              categoryOptions={categoryOptions.filter(c => c.value !== '')}
+              showCategory
               showSemester
               editableName
-              nameLabel="Nama Modul"
-              namePlaceholder="Masukkan nama modul"
-              fileLabel="File Modul"
-              addButtonLabel="Tambah Modul Lain"
+              nameLabel="Nama Project"
+              namePlaceholder="Masukkan nama project"
+              fileLabel="File Project (ZIP)"
               layout="grid"
             />
 
-            <ModulUploadProgress uploadStates={uploadStates} />
+            <ProjectUploadProgress uploadStates={uploadStates} />
 
             <div className="flex justify-end gap-2">
               <Button

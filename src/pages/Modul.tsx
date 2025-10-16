@@ -330,7 +330,7 @@ export default function Modul() {
   ];
 
   const table = useReactTable({
-    data: moduls,
+    data: moduls || [],
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -450,7 +450,7 @@ export default function Modul() {
               <TableCell colSpan={columns.length} className="text-center">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    Menampilkan {moduls.length} dari {pagination?.total_items || 0} data
+                    Menampilkan {moduls?.length || 0} dari {pagination?.total_items || 0} data
                   </div>
                   <Pagination>
                     <PaginationContent>
@@ -460,11 +460,11 @@ export default function Modul() {
                           className={table.getCanPreviousPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
                         />
                       </PaginationItem>
-                      {Array.from({ length: pagination?.total_pages || 0 }, (_, i) => i + 1).map((page) => (
+                      {pagination && pagination.total_pages > 0 && Array.from({ length: pagination.total_pages }, (_, i) => i + 1).map((page) => (
                         <PaginationItem key={page}>
                           <PaginationLink
-                            onClick={() => loadModuls({ ...{ page, limit: pagination?.limit || 10 } })}
-                            isActive={pagination?.page === page}
+                            onClick={() => loadModuls({ page, limit: pagination.limit })}
+                            isActive={pagination.page === page}
                             className="cursor-pointer"
                           >
                             {page}
