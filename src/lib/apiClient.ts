@@ -3,6 +3,8 @@ import type {
   ErrorResponse,
   ValidationErrorResponse,
 } from '@/types';
+import { getAccessToken } from './tokenManager';
+import { tokenRefreshManager } from './tokenRefreshManager';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
@@ -30,11 +32,7 @@ export class APIClient {
   }
 
   protected getAuthToken(): string | null {
-    return localStorage.getItem('access_token');
-  }
-
-  protected getRefreshToken(): string | null {
-    return localStorage.getItem('refresh_token');
+    return getAccessToken();
   }
 
   protected getAuthHeaders(skipAuth: boolean = false): HeadersInit {
@@ -62,7 +60,8 @@ export class APIClient {
 
   protected async request<T extends BaseResponse>(
     endpoint: string,
-    config: RequestConfig = {}
+    config: RequestConfig = {},
+    retryCount: number = 0
   ): Promise<T> {
     const { skipAuth = false, customHeaders, ...fetchOptions } = config;
 
@@ -78,11 +77,23 @@ export class APIClient {
       const response = await fetch(url, {
         ...fetchOptions,
         headers,
+        credentials: 'include',
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401 && !skipAuth && retryCount === 0) {
+          try {
+            await tokenRefreshManager.refreshToken();
+            return this.request<T>(endpoint, config, retryCount + 1);
+          } catch {
+            const { store } = await import('./store');
+            store.dispatch({ type: 'auth/clearAuthState' });
+            throw data as APIError;
+          }
+        }
+
         throw data as APIError;
       }
 
@@ -173,6 +184,7 @@ export class APIClient {
         method: 'POST',
         headers,
         body: formData,
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -211,6 +223,7 @@ export class APIClient {
         method: body ? 'POST' : 'GET',
         headers,
         body: body ? JSON.stringify(body) : undefined,
+        credentials: 'include',
       });
 
       if (!response.ok) {

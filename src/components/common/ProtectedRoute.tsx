@@ -18,8 +18,20 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, requiredPermission, requiredPermissions }: ProtectedRouteProps) {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const initializingAuth = useAppSelector((state) => state.auth.initializingAuth);
   const location = useLocation();
   const { hasPermission, loading } = usePermissions();
+
+  if (initializingAuth) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Restoring session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;

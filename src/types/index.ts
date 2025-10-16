@@ -69,7 +69,12 @@ export interface RegisterRequest {
 export interface AuthResponse {
   user: User;
   access_token: string;
-  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface RefreshTokenResponse {
+  access_token: string;
   token_type: string;
   expires_in: number;
 }
@@ -83,6 +88,10 @@ export interface BaseResponse {
 
 export interface AuthSuccessResponse extends BaseResponse {
   data: AuthResponse;
+}
+
+export interface RefreshTokenSuccessResponse extends BaseResponse {
+  data: RefreshTokenResponse;
 }
 
 export interface ValidationError {

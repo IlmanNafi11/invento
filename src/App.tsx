@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/common/ProtectedRoute'
 import AuthInitializer from './components/common/AuthInitializer'
+import { useTokenRefresh } from './hooks/useTokenRefresh'
 
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
@@ -14,6 +15,8 @@ const Role = lazy(() => import('./pages/Role'))
 const Forbidden = lazy(() => import('./pages/Forbidden'))
 
 function App() {
+  useTokenRefresh();
+
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <AuthInitializer />

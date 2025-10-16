@@ -6,35 +6,36 @@ import type { User, AuthRequest, RegisterRequest, AuthSuccessResponse } from '@/
 
 interface AuthState {
   user: User | null;
+  accessToken: string | null;
   isAuthenticated: boolean;
   loading: boolean;
+  initializingAuth: boolean;
   error: string | null;
 }
 
 const initialState: AuthState = {
   user: null,
+  accessToken: null,
   isAuthenticated: false,
   loading: false,
+  initializingAuth: true,
   error: null,
 };
 
-const loadAuthState = (): AuthState => {
+export const initializeAuth = createAsyncThunk<
+  { access_token: string } | null,
+  void
+>('auth/initializeAuth', async () => {
   try {
-    const token = localStorage.getItem('access_token');
-    const userStr = localStorage.getItem('user');
-    if (token && userStr) {
-      const user = JSON.parse(userStr);
-      return {
-        ...initialState,
-        user,
-        isAuthenticated: true,
-      };
-    }
+    const response = await authAPI.refreshToken();
+    return {
+      access_token: response.data.access_token,
+    };
   } catch {
-    return initialState;
+    console.log('No valid session found or initialization failed');
+    return null;
   }
-  return initialState;
-};
+});
 
 export const login = createAsyncThunk<
   AuthSuccessResponse,
@@ -43,13 +44,7 @@ export const login = createAsyncThunk<
 >('auth/login', async (credentials, { rejectWithValue, dispatch }) => {
   try {
     dispatch(clearProfile());
-
     const response = await authAPI.login(credentials);
-
-    localStorage.setItem('access_token', response.data.access_token);
-    localStorage.setItem('refresh_token', response.data.refresh_token);
-    localStorage.setItem('user', JSON.stringify(response.data.user));
-
     return response;
   } catch (error) {
     const errorInfo = handleAPIError(error);
@@ -69,13 +64,7 @@ export const register = createAsyncThunk<
 >('auth/register', async (userData, { rejectWithValue, dispatch }) => {
   try {
     dispatch(clearProfile());
-
     const response = await authAPI.register(userData);
-
-    localStorage.setItem('access_token', response.data.access_token);
-    localStorage.setItem('refresh_token', response.data.refresh_token);
-    localStorage.setItem('user', JSON.stringify(response.data.user));
-
     return response;
   } catch (error) {
     const errorInfo = handleAPIError(error);
@@ -88,17 +77,35 @@ export const register = createAsyncThunk<
   }
 });
 
+export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
+  try {
+    await authAPI.logout();
+  } catch (error) {
+    console.error('Logout error:', error);
+  } finally {
+    const { tokenRefreshManager } = await import('./tokenRefreshManager');
+    tokenRefreshManager.reset();
+
+    dispatch(clearProfile());
+  }
+});
+
 const authSlice = createSlice({
   name: 'auth',
-  initialState: loadAuthState(),
+  initialState,
   reducers: {
+    setAccessToken: (state, action: PayloadAction<string>) => {
+      state.accessToken = action.payload;
+    },
     clearAuthState: (state) => {
       state.user = null;
+      state.accessToken = null;
       state.isAuthenticated = false;
       state.error = null;
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
+      
+      import('./tokenRefreshManager').then(({ tokenRefreshManager }) => {
+        tokenRefreshManager.reset();
+      });
     },
     clearError: (state) => {
       state.error = null;
@@ -106,6 +113,24 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(initializeAuth.pending, (state) => {
+        state.initializingAuth = true;
+      })
+      .addCase(initializeAuth.fulfilled, (state, action: PayloadAction<{ access_token: string } | null>) => {
+        state.initializingAuth = false;
+        if (action.payload) {
+          state.accessToken = action.payload.access_token;
+          state.isAuthenticated = true;
+        } else {
+          state.accessToken = null;
+          state.isAuthenticated = false;
+        }
+      })
+      .addCase(initializeAuth.rejected, (state) => {
+        state.initializingAuth = false;
+        state.accessToken = null;
+        state.isAuthenticated = false;
+      })
       .addCase(login.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -113,9 +138,9 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action: PayloadAction<AuthSuccessResponse>) => {
         state.loading = false;
         state.user = action.payload.data.user;
+        state.accessToken = action.payload.data.access_token;
         state.isAuthenticated = true;
         state.error = null;
-
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -128,32 +153,23 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state, action: PayloadAction<AuthSuccessResponse>) => {
         state.loading = false;
         state.user = action.payload.data.user;
+        state.accessToken = action.payload.data.access_token;
         state.isAuthenticated = true;
         state.error = null;
-
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Registrasi gagal';
       })
-      .addCase(logoutThunk.fulfilled, (state) => {
+      .addCase(logout.fulfilled, (state) => {
         state.user = null;
+        state.accessToken = null;
         state.isAuthenticated = false;
         state.error = null;
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
+        state.initializingAuth = false;
       });
   },
 });
 
-export const logoutThunk = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
-  dispatch(clearProfile());
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
-});
-
-export const { clearAuthState, clearError } = authSlice.actions;
-export const logout = logoutThunk;
+export const { setAccessToken, clearAuthState, clearError } = authSlice.actions;
 export default authSlice.reducer;

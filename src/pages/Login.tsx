@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { usePermissions } from "@/hooks/usePermissions";
 import { WaveBackground } from "@/components/common/WaveBackground";
 
 const loginSchema = z.object({
@@ -21,12 +20,10 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
+  const navigate = useNavigate();
   const location = useLocation();
   const { login: loginUser, loading, error, isAuthenticated, clearError } = useAuth();
-  const { loading: permissionsLoading } = usePermissions();
-  const [loginSuccess, setLoginSuccess] = useState(false);
-
-  const isRedirecting = isAuthenticated && loginSuccess && permissionsLoading;
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const {
     register,
@@ -42,15 +39,16 @@ export default function Login() {
   const from = location.state?.from?.pathname || "/dashboard";
 
   useEffect(() => {
-    if (isAuthenticated && loginSuccess && !permissionsLoading) {
-      window.location.href = from;
+    if (isAuthenticated && !isRedirecting) {
+      setIsRedirecting(true);
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, loginSuccess, permissionsLoading, from]);
+  }, [isAuthenticated, navigate, from, isRedirecting]);
 
   const onSubmit = async (data: LoginForm) => {
     const result = await loginUser(data);
-    if (result.success) {
-      setLoginSuccess(true);
+    if (!result.success) {
+      setIsRedirecting(false);
     }
   };
 
@@ -120,10 +118,15 @@ export default function Login() {
                 className="w-full bg-white text-gray-900 hover:bg-white/90"
                 disabled={loading || isRedirecting}
               >
-                {loading || isRedirecting ? (
+                {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isRedirecting ? "Memuat hak akses..." : "Sedang masuk..."}
+                    Sedang masuk...
+                  </>
+                ) : isRedirecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sedang mengarahkan...
                   </>
                 ) : (
                   "Masuk"

@@ -102,9 +102,8 @@ export function setupDefaultInterceptors(config?: InterceptorConfig): void {
     ) {
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
+        const { store } = await import('./store');
+        store.dispatch({ type: 'auth/clearAuthState' });
         window.location.href = '/login';
       }
     }
@@ -119,11 +118,6 @@ export const tokenRefreshInterceptor: ErrorInterceptor = async (error) => {
     'code' in error &&
     error.code === 401
   ) {
-    const refreshToken = localStorage.getItem('refresh_token');
-    if (!refreshToken) {
-      throw error;
-    }
-
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
@@ -131,7 +125,7 @@ export const tokenRefreshInterceptor: ErrorInterceptor = async (error) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -139,14 +133,14 @@ export const tokenRefreshInterceptor: ErrorInterceptor = async (error) => {
       }
 
       const data = await response.json();
-      localStorage.setItem('access_token', data.data.access_token);
-      localStorage.setItem('refresh_token', data.data.refresh_token);
+      
+      const { store } = await import('./store');
+      store.dispatch({ type: 'auth/setAccessToken', payload: data.data.access_token });
 
       return error;
     } catch {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
+      const { store } = await import('./store');
+      store.dispatch({ type: 'auth/clearAuthState' });
       window.location.href = '/login';
       throw error;
     }

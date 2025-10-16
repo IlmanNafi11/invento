@@ -1,35 +1,22 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '@/hooks/useAppDispatch';
-import { logout } from '@/lib/authSlice';
+import { initializeAuth } from '@/lib/authSlice';
 
 export default function AuthInitializer() {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
 
   useEffect(() => {
-    const checkTokenValidity = async () => {
-      const token = localStorage.getItem('access_token');
+    dispatch(initializeAuth());
+  }, [dispatch]);
 
-      if (!token) {
-        if (isAuthenticated) {
-          dispatch(logout());
-          navigate('/login');
-        }
-        return;
-      }
-
-      if (!isAuthenticated) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
-        return;
-      }
-    };
-
-    checkTokenValidity();
-  }, [dispatch, isAuthenticated, navigate]);
+  // Debug info
+  useEffect(() => {
+    if (isAuthenticated && !accessToken) {
+      console.warn('Authenticated but no access token found');
+    }
+  }, [isAuthenticated, accessToken]);
 
   return null;
 }

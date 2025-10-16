@@ -6,8 +6,11 @@ import { ThemeProvider } from 'next-themes'
 import { Toaster } from '@/components/ui/sonner'
 import { PermissionsProvider } from '@/hooks/PermissionsProvider'
 import { store } from '@/lib/store'
+import { setStoreGetter } from '@/lib/tokenManager'
 import './index.css'
 import App from './App.tsx'
+
+setStoreGetter(() => store);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

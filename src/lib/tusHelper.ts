@@ -1,4 +1,9 @@
-import type { UploadProgress, ErrorResponse, ValidationErrorResponse } from '@/types';
+import type {
+  ErrorResponse,
+  ValidationErrorResponse,
+  UploadProgress,
+} from '@/types';
+import { getAccessToken } from './tokenManager';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 const MAX_FILE_SIZE_PROJECT = 500 * 1024 * 1024;
@@ -91,7 +96,7 @@ export class TUSHelper {
   }
 
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     return {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
@@ -243,7 +248,7 @@ export class TUSHelper {
       ? `/project/${projectId}/upload` 
       : '/project/upload');
 
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     const headers: Record<string, string> = {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       'Tus-Resumable': TUS_VERSION,
@@ -300,7 +305,7 @@ export class TUSHelper {
     offset: number,
     signal: AbortSignal
   ): Promise<number> {
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     const headers: Record<string, string> = {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       'Tus-Resumable': TUS_VERSION,

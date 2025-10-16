@@ -1,5 +1,6 @@
 import { TUSErrorHandler, TUSErrorType, type TUSError } from './tusErrorHandler';
 import { TUSMetadataEncoder, type TUSMetadata } from './tusMetadata';
+import { getAccessToken } from '../tokenManager';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
@@ -53,7 +54,7 @@ export class TUSClient {
   }
 
   private getAuthToken(): string | null {
-    return localStorage.getItem('access_token');
+    return getAccessToken();
   }
 
   private getAuthHeaders(): HeadersInit {

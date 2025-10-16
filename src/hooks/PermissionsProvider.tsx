@@ -9,6 +9,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const initializingAuth = useAppSelector((state) => state.auth.initializingAuth);
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
 
   const fetchPermissions = useCallback(async () => {
     if (!isAuthenticated) {
@@ -25,10 +27,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     setLoading(true);
 
     try {
-      setLoading(true);
       setError(null);
       const response = await userAPI.getUserPermissions();
-  
+
       const permissionsData = response.data;
 
       setPermissions(permissionsData);
@@ -64,7 +65,11 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (initializingAuth) {
+      return;
+    }
+
+    if (isAuthenticated && accessToken) {
       if (permissions.length === 0) {
         fetchPermissions();
       } else {
@@ -73,7 +78,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     } else {
       clearPermissions();
     }
-  }, [isAuthenticated, permissions.length, fetchPermissions, clearPermissions]);
+  }, [isAuthenticated, initializingAuth, accessToken, permissions.length, fetchPermissions, clearPermissions]);
 
   const value = {
     permissions,

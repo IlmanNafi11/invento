@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
 import { Home, FileText, Briefcase, Users, Shield, User, LogOut } from "lucide-react";
@@ -41,7 +41,6 @@ import { logout } from "@/lib/authSlice";
 import { ProfileDialog } from "@/components/common/ProfileDialog";
 import { getInitials } from "@/utils/format";
 import { getProfileImageUrl } from "@/utils/profileUtils";
-import { authAPI } from "@/lib/auth";
 
 export default function Layout() {
   const isOpen = useAppSelector((state) => state.sidebar.open);
@@ -52,23 +51,12 @@ export default function Layout() {
   const { hasPermission } = usePermissions();
   const isMobile = useIsMobile();
   const [profileOpen, setProfileOpen] = useState(false);
-  const [shouldNavigateToLogin, setShouldNavigateToLogin] = useState(false);
 
   const handleLogout = async () => {
-    await authAPI.logout();
-
-    dispatch(logout());
+    await dispatch(logout());
     toast.success('Berhasil logout');
-
-    setShouldNavigateToLogin(true);
+    navigate('/login', { replace: true });
   };
-
-  useEffect(() => {
-    if (shouldNavigateToLogin) {
-      navigate('/login');
-      setShouldNavigateToLogin(false);
-    }
-  }, [shouldNavigateToLogin, navigate]);
 
   const handleProfileUpdate = () => {
     refreshProfile();

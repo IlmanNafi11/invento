@@ -7,12 +7,13 @@ import type {
   RoleUpdateResponse,
   PermissionsResponse,
 } from '@/types';
+import { getAccessToken } from './tokenManager';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
 class RoleAPI {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

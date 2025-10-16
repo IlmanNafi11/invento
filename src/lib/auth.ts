@@ -3,6 +3,7 @@ import type {
   AuthRequest,
   RegisterRequest,
   AuthSuccessResponse,
+  RefreshTokenSuccessResponse,
   SuccessResponse,
 } from '@/types';
 
@@ -16,14 +17,11 @@ class AuthAPIClient extends APIClient {
   }
 
   async logout(): Promise<SuccessResponse> {
-    const refreshToken = this.getRefreshToken();
-    return this.post<SuccessResponse>('/auth/logout', undefined, {
-      customHeaders: refreshToken ? { 'X-Refresh-Token': refreshToken } : {},
-    });
+    return this.post<SuccessResponse>('/auth/logout');
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthSuccessResponse> {
-    return this.post<AuthSuccessResponse>('/auth/refresh', { refresh_token: refreshToken }, { skipAuth: true });
+  async refreshToken(): Promise<RefreshTokenSuccessResponse> {
+    return this.post<RefreshTokenSuccessResponse>('/auth/refresh', undefined, { skipAuth: true });
   }
 }
 
