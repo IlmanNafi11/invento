@@ -30,7 +30,7 @@ export function useUser() {
     async (id: number, role: UpdateUserRoleRequest) => {
       try {
         await dispatch(updateUserRole({ id, role })).unwrap();
-        await dispatch(fetchUsers({ limit: 1000 }));
+        await dispatch(fetchUsers({ limit: 10 }));
         return { success: true };
       } catch (error) {
         return { success: false, error: error as string };

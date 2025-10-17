@@ -3,12 +3,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { useAppSelector } from '@/hooks/useAppSelector';
-import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useUser } from '@/hooks/useUser';
-import { fetchRoles } from '@/lib/roleSlice';
 import { useDebounce } from '@/hooks/useDebounce';
+import { extractUniqueRoles } from '@/utils/format';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { UserMobileFilter } from '@/components/user/UserMobileFilter';
 import { UserTable } from '@/components/user/UserTable';
@@ -31,17 +29,15 @@ export default function User() {
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
 
-  const dispatch = useAppDispatch();
   const { users, userFiles, loading, error, loadUsers, updateRole, deleteUser, loadUserFiles, downloadFiles, clearError } = useUser();
-  const roles = useAppSelector((state) => state.role.roles);
 
   const debouncedSearch = useDebounce(search, 500);
   const canDownloadUserFiles = hasPermission('user', 'download');
+  const roles = useMemo(() => extractUniqueRoles(users), [users]);
 
   useEffect(() => {
-    void loadUsers({ limit: 1000 });
-    dispatch(fetchRoles({ limit: 1000 }));
-  }, [dispatch, loadUsers]);
+    void loadUsers({ limit: 10 });
+  }, [loadUsers]);
 
   useEffect(() => {
     if (error) {
@@ -100,7 +96,7 @@ export default function User() {
 
   const openViewDialog = async (user: UserItem) => {
     setViewingUser(user);
-    const result = await loadUserFiles(parseInt(user.id), { limit: 1000 });
+    const result = await loadUserFiles(parseInt(user.id), { limit: 10 });
     if (!result.success) {
       toast.error(result.error || 'Gagal memuat file user');
     }

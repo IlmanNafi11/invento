@@ -17,3 +17,14 @@ export function formatDate(date: Date): string {
 export function getInitials(email: string): string {
   return email.charAt(0).toUpperCase();
 }
+
+
+export function extractUniqueRoles(users: Array<{ role: { name: string } }>): Array<{ id: number; nama_role: string; jumlah_permission: number; tanggal_diperbarui: string }> {
+  const uniqueRoles = Array.from(new Set(users.map(user => user.role.name)));
+  return uniqueRoles.map((role, index) => ({
+    id: index + 1,
+    nama_role: role,
+    jumlah_permission: 0,
+    tanggal_diperbarui: new Date().toISOString(),
+  }));
+}
