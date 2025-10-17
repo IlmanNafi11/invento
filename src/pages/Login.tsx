@@ -2,13 +2,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useForgotPassword } from "@/hooks/useForgotPassword";
@@ -18,6 +18,7 @@ import { WaveBackground } from "@/components/common/WaveBackground";
 import { ForgotPasswordDialog } from "@/components/common/ForgotPasswordDialog";
 import { OTPVerificationDialog } from "@/components/common/OTPVerificationDialog";
 import { PasswordResetDialog } from "@/components/common/PasswordResetDialog";
+import { LoadingOverlay } from "@/components/common/LoadingOverlay";
 
 const loginSchema = z.object({
   email: z.string().email("Format email tidak valid"),
@@ -35,6 +36,7 @@ export default function Login() {
   const { login: loginUser, loading, error, isAuthenticated, clearError } = useAuth();
   const { loading: permissionsLoading } = usePermissions();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -47,7 +49,6 @@ export default function Login() {
   const emailField = register("email");
   const passwordField = register("password");
 
-  // Forgot password states
   const [forgotPasswordStep, setForgotPasswordStep] = useState<ResetPasswordStep>('idle');
   const [forgotPasswordDialogOpen, setForgotPasswordDialogOpen] = useState(false);
   const [otpDialogOpen, setOtpDialogOpen] = useState(false);
@@ -85,7 +86,6 @@ export default function Login() {
     }
   };
 
-  // Forgot Password Flow Handlers
   const handleForgotPasswordClick = () => {
     setForgotPasswordStep('email');
     setForgotPasswordDialogOpen(true);
@@ -133,8 +133,6 @@ export default function Login() {
       setForgotPasswordStep('success');
       setPasswordResetDialogOpen(false);
 
-      // Wait for permissions to load before redirecting
-      // Max wait time: 5 seconds to prevent infinite loading
       const maxWaitTime = 5000;
       const startTime = Date.now();
       
@@ -143,11 +141,9 @@ export default function Login() {
           const checkPermissions = () => {
             const elapsed = Date.now() - startTime;
             
-            // Check if permissions loaded or timeout reached
             if (!permissionsLoading || elapsed > maxWaitTime) {
               resolve();
             } else {
-              // Check again after 100ms
               setTimeout(checkPermissions, 100);
             }
           };
@@ -174,8 +170,40 @@ export default function Login() {
     setResetEmail('');
   };
 
+  const loadingOverlayContent = useMemo(() => {
+    if (isRedirecting) {
+      return {
+        primary: "Mengalihkan Anda ke Invento",
+        secondary: "Mempersiapkan dashboard dan preferensi Anda",
+      };
+    }
+    if (loading) {
+      return {
+        primary: "Sedang memverifikasi kredensial",
+        secondary: "Mengamankan akses dan menyiapkan sesi Anda",
+      };
+    }
+    if (permissionsLoading) {
+      return {
+        primary: "Memuat izin terbaru",
+        secondary: "Menyesuaikan fitur sesuai peran Anda",
+      };
+    }
+    return {
+      primary: "Menyiapkan Invento",
+      secondary: "Mohon tunggu sebentar...",
+    };
+  }, [isRedirecting, loading, permissionsLoading]);
+
+  const shouldShowOverlay = loading || permissionsLoading || isRedirecting;
+
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#060509] px-6 py-12">
+      <LoadingOverlay
+        show={shouldShowOverlay}
+        message={loadingOverlayContent.primary}
+        subMessage={loadingOverlayContent.secondary}
+      />
       <WaveBackground />
       <div className="relative z-10 w-full max-w-md">
         <Card className="w-full border-white/10 bg-white/5 text-white shadow-[0_30px_90px_rgba(148,77,255,0.18)] backdrop-blur-lg supports-[backdrop-filter]:backdrop-blur-lg">
@@ -224,17 +252,28 @@ export default function Login() {
                     Lupa password?
                   </span>
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  {...passwordField}
-                  onChange={(event) => {
-                    passwordField.onChange(event);
-                    handleInputChange();
-                  }}
-                  className="border-white/10 bg-white/10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    {...passwordField}
+                    onChange={(event) => {
+                      passwordField.onChange(event);
+                      handleInputChange();
+                    }}
+                    className="border-white/10 bg-white/10 pr-10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    disabled={loading || isRedirecting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 transition hover:text-white disabled:opacity-50"
+                    aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 {errors.password && <p className="text-sm text-red-300">{errors.password.message}</p>}
               </div>
               <Button
@@ -269,7 +308,6 @@ export default function Login() {
         </Card>
       </div>
 
-      {/* Forgot Password Dialogs */}
       <ForgotPasswordDialog
         open={forgotPasswordDialogOpen && forgotPasswordStep === 'email'}
         onOpenChange={(open) => {

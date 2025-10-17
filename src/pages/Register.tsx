@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRegisterOTP } from "@/hooks/useRegisterOTP";
@@ -53,6 +53,8 @@ export default function Register() {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerOtpExpiresIn, setRegisterOtpExpiresIn] = useState(600);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const {
     initiateRegisterOTP,
@@ -214,34 +216,56 @@ export default function Register() {
                 <Label htmlFor="password" className="text-sm font-medium text-white">
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  {...passwordField}
-                  onChange={(event) => {
-                    passwordField.onChange(event);
-                    handleInputChange();
-                  }}
-                  className="border-white/10 bg-white/10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    {...passwordField}
+                    onChange={(event) => {
+                      passwordField.onChange(event);
+                      handleInputChange();
+                    }}
+                    className="border-white/10 bg-white/10 pr-10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    disabled={registerOTPLoading || isRedirecting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 transition hover:text-white disabled:opacity-50"
+                    aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 {errors.password && <p className="text-sm text-red-300">{errors.password.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium text-white">
                   Konfirmasi Password
                 </Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Ulangi password"
-                  {...confirmPasswordField}
-                  onChange={(event) => {
-                    confirmPasswordField.onChange(event);
-                    handleInputChange();
-                  }}
-                  className="border-white/10 bg-white/10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Ulangi password"
+                    {...confirmPasswordField}
+                    onChange={(event) => {
+                      confirmPasswordField.onChange(event);
+                      handleInputChange();
+                    }}
+                    className="border-white/10 bg-white/10 pr-10 text-white placeholder:text-white/50 focus-visible:border-white/40 focus-visible:ring-white/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    disabled={registerOTPLoading || isRedirecting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 transition hover:text-white disabled:opacity-50"
+                    aria-label={showConfirmPassword ? "Sembunyikan konfirmasi password" : "Tampilkan konfirmasi password"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 {errors.confirmPassword && <p className="text-sm text-red-300">{errors.confirmPassword.message}</p>}
               </div>
               <Button

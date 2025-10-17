@@ -144,26 +144,17 @@ export function OTPVerificationDialog({
   const canResend = resendCooldown === 0 && !isResending && !loading && resendCount < maxResendAttempts;
   const isMaxResendReached = resendCount >= maxResendAttempts;
 
-  const getResendButtonLabel = () => {
-    if (isResending) {
-      return (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Mengirim ulang...
-        </>
-      );
-    }
-    
+  const resendLabel = (() => {
     if (isMaxResendReached) {
       return `Batas pengiriman (${resendCount}/${maxResendAttempts})`;
     }
-    
+
     if (resendCooldown > 0) {
       return `Kirim ulang kode (${formatTime(resendCooldown)})`;
     }
-    
+
     return `Kirim ulang kode${resendCount > 0 ? ` (${resendCount}/${maxResendAttempts})` : ''}`;
-  };
+  })();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -237,19 +228,21 @@ export function OTPVerificationDialog({
             </Button>
           </div>
 
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleResend}
-            disabled={!canResend}
-            className={`w-full text-sm ${
-              canResend
-                ? 'cursor-pointer text-white/70 hover:text-white hover:bg-white/5'
-                : 'cursor-not-allowed text-white/40'
-            }`}
-          >
-            {getResendButtonLabel()}
-          </Button>
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={!canResend}
+              className={`inline-flex items-center gap-2 text-sm font-medium transition-colors ${
+                canResend
+                  ? 'text-white/70 hover:text-white'
+                  : 'cursor-not-allowed text-white/40'
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              {isResending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>{isResending ? 'Mengirim ulang...' : resendLabel}</span>
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
