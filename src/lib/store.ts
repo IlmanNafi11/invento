@@ -6,6 +6,7 @@ import authReducer from './authSlice'
 import profileReducer from './profileSlice'
 import modulReducer from './modulSlice'
 import projectReducer from './projectSlice'
+import permissionReducer from './permissionSlice'
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     profile: profileReducer,
     modul: modulReducer,
     project: projectReducer,
+    permission: permissionReducer,
   },
 })
 

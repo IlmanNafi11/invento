@@ -1,11 +1,7 @@
 import { useCallback } from 'react';
 import { useAppDispatch } from './useAppDispatch';
 import { useAppSelector } from './useAppSelector';
-import {
-  fetchModuls,
-  deleteModul,
-  clearError,
-} from '@/lib/modulSlice';
+import { fetchModuls, deleteModul, clearError } from '@/lib/modulSlice';
 
 export function useModul() {
   const dispatch = useAppDispatch();
@@ -14,19 +10,14 @@ export function useModul() {
   );
 
   const loadModuls = useCallback(
-    async (params?: {
+    (params?: {
       search?: string;
       filter_type?: string;
       filter_semester?: number;
       page?: number;
       limit?: number;
     }) => {
-      try {
-        await dispatch(fetchModuls(params)).unwrap();
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error as string };
-      }
+      return dispatch(fetchModuls(params));
     },
     [dispatch]
   );

@@ -1,51 +1,28 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { ApiPermission } from '@/types';
-import { userAPI } from '@/lib/userAPI';
+import { useEffect, useCallback, type ReactNode } from 'react';
 import { useAppSelector } from './useAppSelector';
+import { useAppDispatch } from './useAppDispatch';
+import { fetchPermissions, clearPermissions } from '@/lib/permissionSlice';
 import { PermissionsContext } from './PermissionsContext';
 
 export function PermissionsProvider({ children }: { children: ReactNode }) {
-  const [permissions, setPermissions] = useState<ApiPermission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { permissions, loading, error } = useAppSelector(
+    (state) => state.permission
+  );
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const initializingAuth = useAppSelector((state) => state.auth.initializingAuth);
-  const accessToken = useAppSelector((state) => state.auth.accessToken);
 
-  const fetchPermissions = useCallback(async () => {
-    if (!isAuthenticated) {
-      setPermissions([]);
-      setLoading(false);
+  const fetchAndSetPermissions = useCallback(async () => {
+    if (!isAuthenticated || permissions.length > 0) {
       return;
     }
 
-    if (permissions.length > 0) {
-      setLoading(false);
-      return;
-    }
+    await dispatch(fetchPermissions()).unwrap();
+  }, [isAuthenticated, permissions.length, dispatch]);
 
-    setLoading(true);
-
-    try {
-      setError(null);
-      const response = await userAPI.getUserPermissions();
-
-      const permissionsData = response.data;
-
-      setPermissions(permissionsData);
-    } catch {
-      setError('Failed to load permissions');
-      setPermissions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated, permissions.length]);
-
-  const clearPermissions = useCallback(() => {
-    setPermissions([]);
-    setError(null);
-    setLoading(false);
-  }, []);
+  const clearPermissionsData = useCallback(() => {
+    dispatch(clearPermissions());
+  }, [dispatch]);
 
   const hasPermission = useCallback((resource: string, action: string): boolean => {
     const resourceLower = resource.toLowerCase();
@@ -60,8 +37,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   }, [permissions]);
 
   const refreshPermissions = async () => {
-    setPermissions([]);
-    await fetchPermissions();
+    dispatch(clearPermissions());
+    await dispatch(fetchPermissions()).unwrap();
   };
 
   useEffect(() => {
@@ -69,16 +46,20 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (isAuthenticated && accessToken) {
+    if (isAuthenticated) {
       if (permissions.length === 0) {
-        fetchPermissions();
-      } else {
-        setLoading(false);
+        fetchAndSetPermissions();
       }
     } else {
-      clearPermissions();
+      clearPermissionsData();
     }
-  }, [isAuthenticated, initializingAuth, accessToken, permissions.length, fetchPermissions, clearPermissions]);
+  }, [
+    isAuthenticated,
+    initializingAuth,
+    permissions.length,
+    fetchAndSetPermissions,
+    clearPermissionsData,
+  ]);
 
   const value = {
     permissions,

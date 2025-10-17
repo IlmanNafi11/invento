@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/pagination';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { EmptyState } from '@/components/common/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/utils/format';
 import { useDebounce } from '@/hooks/useDebounce';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -56,7 +57,7 @@ const semesterOptions = [
 
 export default function Modul() {
   const { hasPermission } = usePermissions();
-  const { moduls, pagination, loadModuls, deleteExistingModul } = useModul();
+  const { moduls, pagination, loading, loadModuls, deleteExistingModul } = useModul();
 
   const [search, setSearch] = useState('');
   const [fileType, setFileType] = useState('all');
@@ -427,7 +428,17 @@ export default function Modul() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading && (moduls ?? []).length === 0 ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`}>
+                  {columns.map((_, j) => (
+                    <TableCell key={`skeleton-cell-${i}-${j}`}>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
