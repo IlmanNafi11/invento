@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, easeInOut } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type LoadingOverlayProps = {
@@ -12,7 +12,7 @@ type LoadingOverlayProps = {
 
 const shimmerTransition = {
   duration: 8,
-  ease: "easeInOut",
+  ease: easeInOut,
   repeat: Infinity,
   repeatType: "mirror" as const,
 };
@@ -50,7 +50,7 @@ export function LoadingOverlay({
               <motion.div
                 className="relative flex h-40 w-40 items-center justify-center"
                 animate={{ rotate: [0, 2, -2, 0] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                transition={{ duration: 6, repeat: Infinity, ease: easeInOut }}
               >
                 <div className="absolute inset-0 rounded-[36px] bg-gradient-to-br from-[#7a5cff] via-[#9c4dff] to-[#ff3f8e] opacity-80 blur-3xl" />
                 <motion.div
@@ -67,13 +67,13 @@ export function LoadingOverlay({
                   <motion.div
                     className="absolute size-[86%] rounded-[28px] border border-white/25"
                     animate={{ rotate: [-8, 8, -8] }}
-                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{ duration: 10, repeat: Infinity, ease: easeInOut }}
                   />
 
                   <motion.div
                     className="absolute size-[65%] rounded-full border border-white/40 bg-white/5 backdrop-blur-sm"
                     animate={{ scale: [1, 1.08, 1] }}
-                    transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{ duration: 2.6, repeat: Infinity, ease: easeInOut }}
                   />
 
                   <motion.span
@@ -85,7 +85,7 @@ export function LoadingOverlay({
                   <motion.div
                     className="relative size-14 rounded-full bg-gradient-to-br from-white via-[#d9d4ff] to-[#ffd4f0] shadow-[0_12px_35px_rgba(156,77,255,0.35)]"
                     animate={{ scale: [1, 0.92, 1], rotate: [0, 8, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{ duration: 2, repeat: Infinity, ease: easeInOut }}
                   />
                 </motion.div>
               </motion.div>
