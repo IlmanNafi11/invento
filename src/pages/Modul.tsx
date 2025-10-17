@@ -458,38 +458,40 @@ export default function Modul() {
           </TableBody>
           <TableFooter>
             <TableRow>
-              <TableCell colSpan={columns.length} className="text-center">
+              <TableCell colSpan={columns.length}>
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
                     Menampilkan {moduls?.length || 0} dari {pagination?.total_items || 0} data
                   </div>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() => table.previousPage()}
-                          className={table.getCanPreviousPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
-                        />
-                      </PaginationItem>
-                      {pagination && pagination.total_pages > 0 && Array.from({ length: pagination.total_pages }, (_, i) => i + 1).map((page) => (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => loadModuls({ page, limit: pagination.limit })}
-                            isActive={pagination.page === page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
+                  <div className="space-x-2">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => table.previousPage()}
+                            className={table.getCanPreviousPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                          />
                         </PaginationItem>
-                      ))}
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() => table.nextPage()}
-                          className={table.getCanNextPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+                        {pagination && pagination.total_pages > 0 && Array.from({ length: pagination.total_pages }, (_, i) => i + 1).map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => loadModuls({ page, limit: pagination.limit })}
+                              isActive={pagination.page === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => table.nextPage()}
+                            className={table.getCanNextPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
                 </div>
               </TableCell>
             </TableRow>
