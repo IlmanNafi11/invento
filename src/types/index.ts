@@ -403,3 +403,14 @@ export interface VerifyOTPResponse extends BaseResponse {
     message: string;
   };
 }
+
+export interface Statistics {
+  total_project?: number;
+  total_modul?: number;
+  total_user?: number;
+  total_role?: number;
+}
+
+export interface StatisticsResponse extends BaseResponse {
+  data: Statistics;
+}
