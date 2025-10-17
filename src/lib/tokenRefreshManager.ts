@@ -1,3 +1,5 @@
+import { setAccessToken, clearAuth } from './tokenManager';
+
 interface RefreshSubscriber {
   resolve: (token: string) => void;
   reject: (error: Error) => void;
@@ -74,13 +76,10 @@ class TokenRefreshManager {
         throw new Error('No access token in refresh response');
       }
 
-      const { store } = await import('./store');
-      store.dispatch({ type: 'auth/setAccessToken', payload: data.data.access_token });
-
+      setAccessToken(data.data.access_token);
       return data.data.access_token;
     } catch (error) {
-      const { store } = await import('./store');
-      store.dispatch({ type: 'auth/clearAuthState' });
+      clearAuth();
 
       throw error instanceof Error ? error : new Error('Token refresh failed');
     }

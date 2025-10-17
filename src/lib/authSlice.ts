@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/tool
 import { authAPI } from './auth';
 import { clearProfile } from './profileSlice';
 import { handleAPIError } from './apiUtils';
+import { tokenRefreshManager } from './tokenRefreshManager';
 import type { User, AuthRequest, RegisterRequest, AuthSuccessResponse } from '@/types';
 
 interface AuthState {
@@ -120,9 +121,7 @@ export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) =>
   } catch (error) {
     console.error('Logout error:', error);
   } finally {
-    const { tokenRefreshManager } = await import('./tokenRefreshManager');
     tokenRefreshManager.reset();
-
     dispatch(clearProfile());
   }
 });
@@ -143,10 +142,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.initializingAuth = false;
       state.error = null;
-      
-      import('./tokenRefreshManager').then(({ tokenRefreshManager }) => {
-        tokenRefreshManager.reset();
-      });
+      tokenRefreshManager.reset();
     },
     clearError: (state) => {
       state.error = null;

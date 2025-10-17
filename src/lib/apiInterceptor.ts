@@ -1,4 +1,5 @@
 import type { BaseResponse, ErrorResponse } from '@/types';
+import { setAccessToken, clearAuth } from './tokenManager';
 
 export type RequestInterceptor = (config: RequestInit) => RequestInit | Promise<RequestInit>;
 export type ResponseInterceptor<T = BaseResponse> = (response: T) => T | Promise<T>;
@@ -102,8 +103,7 @@ export function setupDefaultInterceptors(config?: InterceptorConfig): void {
     ) {
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register') {
-        const { store } = await import('./store');
-        store.dispatch({ type: 'auth/clearAuthState' });
+        clearAuth();
         window.location.href = '/login';
       }
     }
@@ -133,14 +133,10 @@ export const tokenRefreshInterceptor: ErrorInterceptor = async (error) => {
       }
 
       const data = await response.json();
-      
-      const { store } = await import('./store');
-      store.dispatch({ type: 'auth/setAccessToken', payload: data.data.access_token });
-
+      setAccessToken(data.data.access_token);
       return error;
     } catch {
-      const { store } = await import('./store');
-      store.dispatch({ type: 'auth/clearAuthState' });
+      clearAuth();
       window.location.href = '/login';
       throw error;
     }

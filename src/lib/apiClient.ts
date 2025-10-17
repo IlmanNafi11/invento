@@ -3,7 +3,7 @@ import type {
   ErrorResponse,
   ValidationErrorResponse,
 } from '@/types';
-import { getAccessToken } from './tokenManager';
+import { getAccessToken, clearAuth } from './tokenManager';
 import { tokenRefreshManager } from './tokenRefreshManager';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
@@ -88,8 +88,7 @@ export class APIClient {
             await tokenRefreshManager.refreshToken();
             return this.request<T>(endpoint, config, retryCount + 1);
           } catch {
-            const { store } = await import('./store');
-            store.dispatch({ type: 'auth/clearAuthState' });
+            clearAuth();
             throw data as APIError;
           }
         }

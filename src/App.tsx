@@ -18,7 +18,7 @@ function App() {
   useTokenRefresh();
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div><p className="text-sm text-muted-foreground">Loading...</p></div></div>}>
       <AuthInitializer />
       <Routes>
         <Route path="/login" element={<Login />} />
