@@ -275,27 +275,7 @@ class ProjectAPIClient extends APIClient {
   }
 
   async downloadProjects(ids: number[]): Promise<{ blob: Blob; filename: string }> {
-    const response = await fetch(`${this.baseURL}/project/download`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders(),
-      },
-      body: JSON.stringify({ ids }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw errorData;
-    }
-
-    const blob = await response.blob();
-    const contentDisposition = response.headers.get('Content-Disposition');
-    const filename = contentDisposition
-      ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') || 'projects.zip'
-      : 'projects.zip';
-
-    return { blob, filename };
+    return this.download('/project/download', { ids });
   }
 }
 

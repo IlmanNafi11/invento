@@ -11,6 +11,7 @@ import { RoleTableHeader } from './RoleTableHeader';
 import { RoleTableRow } from './RoleTableRow';
 import { RoleTableFooter } from './RoleTableFooter';
 import { EmptyState } from '@/components/common/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { RoleListItem } from '@/types';
 
 interface RoleTableProps {
@@ -77,7 +78,17 @@ export function RoleTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {roles.length > 0 ? (
+          {loading && (roles ?? []).length === 0 ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={`skeleton-${i}`}>
+                {[0, 1, 2, 3].map((j) => (
+                  <TableCell key={`skeleton-cell-${i}-${j}`}>
+                    <Skeleton className="h-6 w-full" />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : roles.length > 0 ? (
             roles.map((role) => (
               <RoleTableRow
                 key={role.id}

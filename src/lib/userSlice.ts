@@ -98,6 +98,7 @@ export const downloadUserFiles = createAsyncThunk<
 >('user/downloadUserFiles', async ({ userId, projectIds, modulIds }, { rejectWithValue }) => {
   try {
     const { blob, filename } = await userAPI.downloadUserFiles(userId, projectIds, modulIds);
+    
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;

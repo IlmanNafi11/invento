@@ -209,11 +209,15 @@ export class APIClient {
   ): Promise<DownloadResult> {
     const { skipAuth = false, customHeaders, extractFilename = true, ...fetchOptions } = config || {};
 
+    const authHeaders = this.getAuthHeaders(skipAuth);
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...this.getAuthHeaders(skipAuth),
+      ...authHeaders,
       ...customHeaders,
     };
+
+    if (body && typeof headers === 'object' && !Array.isArray(headers)) {
+      (headers as Record<string, string>)['Content-Type'] = 'application/json';
+    }
 
     const url = `${this.baseURL}${endpoint}`;
 
@@ -227,20 +231,55 @@ export class APIClient {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw data as APIError;
+        try {
+          const data = await response.json();
+          throw data as APIError;
+        } catch (parseError) {
+          console.error('Failed to parse error response as JSON:', parseError);
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       }
 
-      const blob = await response.blob();
       const filename = extractFilename
         ? this.extractFilenameFromResponse(response)
         : 'download';
 
+      const clonedResponse = response.clone();
+      let blob: Blob;
+      
+      try {
+        blob = await response.blob();
+      } catch {
+        try {
+          const arrayBuffer = await clonedResponse.arrayBuffer();
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          blob = new Blob([arrayBuffer], { type: contentType });
+        } catch (arrayBufferError) {
+          throw new Error(`Gagal membaca response body: ${arrayBufferError instanceof Error ? arrayBufferError.message : 'Unknown error'}`);
+        }
+      }
+      
+      if (blob.size === 0) {
+        throw new Error('Response body kosong - file tidak ditemukan atau kosong');
+      }
+
       return { blob, filename };
     } catch (error) {
+      console.error('Download catch block error:', error);
       if (this.isAPIError(error)) {
+        console.log('Error is APIError, throwing as-is');
         throw error;
       }
+      if (error instanceof Error) {
+        console.log('Error is Error instance, wrapping:', error.message);
+        throw {
+          success: false,
+          message: error.message,
+          code: 0,
+          timestamp: new Date().toISOString(),
+        } as APIError;
+      }
+      console.log('Error is unknown type, creating network error');
       throw this.createNetworkError(error);
     }
   }

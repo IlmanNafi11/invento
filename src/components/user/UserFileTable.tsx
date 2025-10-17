@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -19,30 +20,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useDebounce } from '@/hooks/useDebounce';
+import { EmptyState } from '@/components/common/EmptyState';
 import type { UserFile } from '@/types';
 
 interface UserFileTableProps {
   files: UserFile[];
   canDownload: boolean;
+  loading?: boolean;
   onDownload: (file: UserFile) => void;
   onBulkDownload: (files: UserFile[]) => void;
 }
 
-export function UserFileTable({ files, canDownload, onDownload, onBulkDownload }: UserFileTableProps) {
+export function UserFileTable({ files, canDownload, loading = false, onDownload, onBulkDownload }: UserFileTableProps) {
   const [fileSearch, setFileSearch] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const debouncedFileSearch = useDebounce(fileSearch, 500);
@@ -50,6 +45,7 @@ export function UserFileTable({ files, canDownload, onDownload, onBulkDownload }
   const getFileKey = (file: UserFile) => `${file.kategori.toLowerCase()}:${file.id}`;
 
   const filteredFiles = useMemo(() => {
+    if (!files || files.length === 0) return [];
     if (!debouncedFileSearch) return files;
     return files.filter(file =>
       file.nama_file.toLowerCase().includes(debouncedFileSearch.toLowerCase()) ||
@@ -59,9 +55,11 @@ export function UserFileTable({ files, canDownload, onDownload, onBulkDownload }
 
   const fileLookup = useMemo(() => {
     const map = new Map<string, UserFile>();
-    files.forEach((file) => {
-      map.set(getFileKey(file), file);
-    });
+    if (files && files.length > 0) {
+      files.forEach((file) => {
+        map.set(getFileKey(file), file);
+      });
+    }
     return map;
   }, [files]);
 
@@ -147,6 +145,35 @@ export function UserFileTable({ files, canDownload, onDownload, onBulkDownload }
     getPaginationRowModel: getPaginationRowModel(),
   });
 
+  if (loading && (files == null || files.length === 0)) {
+    return (
+      <div className="max-h-96 overflow-y-auto">
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead colSpan={fileColumns.length} className="text-left py-2">
+                  <div className="text-sm font-medium">File User</div>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`}>
+                  {fileColumns.map((_, j) => (
+                    <TableCell key={`skeleton-cell-${i}-${j}`}>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-h-96 overflow-y-auto">
       <div className="rounded-md border">
@@ -182,12 +209,10 @@ export function UserFileTable({ files, canDownload, onDownload, onBulkDownload }
               </TableHead>
             </TableRow>
             {fileTable.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-muted/50">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
@@ -206,43 +231,16 @@ export function UserFileTable({ files, canDownload, onDownload, onBulkDownload }
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={fileColumns.length} className="h-24 text-center">
-                  Tidak ada file.
+                <TableCell colSpan={fileColumns.length} className="p-0 border-0">
+                  <EmptyState
+                    title="Belum ada file"
+                    description="User belum memiliki file apapun"
+                  />
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="space-x-2">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => fileTable.previousPage()}
-                  className={fileTable.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-              {Array.from({ length: fileTable.getPageCount() }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => fileTable.setPageIndex(page - 1)}
-                    isActive={fileTable.getState().pagination.pageIndex === page - 1}
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => fileTable.nextPage()}
-                  className={fileTable.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
       </div>
     </div>
   );

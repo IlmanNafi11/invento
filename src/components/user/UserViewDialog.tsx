@@ -13,6 +13,7 @@ interface UserViewDialogProps {
   onOpenChange: (open: boolean) => void;
   user: UserItem | null;
   files: UserFile[];
+  loading?: boolean;
   canDownload: boolean;
   onDownloadFile: (file: UserFile) => void;
   onBulkDownload: (files: UserFile[]) => void;
@@ -23,6 +24,7 @@ export function UserViewDialog({
   onOpenChange,
   user,
   files,
+  loading = false,
   canDownload,
   onDownloadFile,
   onBulkDownload,
@@ -48,6 +50,7 @@ export function UserViewDialog({
             <div className="mt-2">
               <UserFileTable
                 files={files}
+                loading={loading}
                 canDownload={canDownload}
                 onDownload={onDownloadFile}
                 onBulkDownload={onBulkDownload}

@@ -11,6 +11,7 @@ import {
 import { Search, Upload, Edit, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -57,7 +58,7 @@ const semesterOptions: { value: string; label: string }[] = [
 
 export default function Project() {
   const { hasPermission } = usePermissions();
-  const { projects, pagination, loadProjects, deleteExistingProject } = useProject();
+  const { projects, loading, pagination, loadProjects, deleteExistingProject } = useProject();
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<ProjectCategory | ''>('');
@@ -313,6 +314,7 @@ export default function Project() {
       document.body.removeChild(a);
       toast.success('Project berhasil didownload');
     } catch (error) {
+      console.error('Download error details:', error);
       const err = error as ErrorResponse | ValidationErrorResponse;
       toast.error(err.message || 'Gagal mendownload project');
     }
@@ -466,7 +468,17 @@ export default function Project() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading && (projects ?? []).length === 0 ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`}>
+                  {columns.map((_, j) => (
+                    <TableCell key={`skeleton-cell-${i}-${j}`}>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (

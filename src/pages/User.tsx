@@ -32,7 +32,7 @@ export default function User() {
   const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
 
   const dispatch = useAppDispatch();
-  const { users, userFiles, error, loadUsers, updateRole, deleteUser, loadUserFiles, downloadFiles, clearError } = useUser();
+  const { users, userFiles, loading, error, loadUsers, updateRole, deleteUser, loadUserFiles, downloadFiles, clearError } = useUser();
   const roles = useAppSelector((state) => state.role.roles);
 
   const debouncedSearch = useDebounce(search, 500);
@@ -205,11 +205,12 @@ export default function User() {
         onDelete={openDeleteDialog}
       />
 
-      <UserViewDialog
+            <UserViewDialog
         open={isViewOpen}
         onOpenChange={setIsViewOpen}
         user={viewingUser}
         files={userFiles}
+        loading={loading}
         canDownload={canDownloadUserFiles}
         onDownloadFile={handleDownload}
         onBulkDownload={handleBulkDownload}
