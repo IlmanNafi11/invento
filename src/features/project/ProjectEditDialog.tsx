@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +9,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
-import { ProjectUploadProgress, type FileUploadState } from './ProjectUploadProgress';
 import type { ProjectListItem, ProjectCategory } from '@/types';
 
 interface ProjectForm {
@@ -22,7 +20,6 @@ interface ProjectEditDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: ProjectForm) => Promise<void>;
   editingItem: ProjectListItem | null;
-  uploadStates: FileUploadState[];
   isLoading: boolean;
   categoryOptions: { value: ProjectCategory | ''; label: string }[];
 }
@@ -32,8 +29,6 @@ export function ProjectEditDialog({
   onOpenChange,
   onSubmit,
   editingItem,
-  uploadStates,
-  isLoading,
   categoryOptions,
 }: ProjectEditDialogProps) {
   const form = useForm<ProjectForm>({
@@ -59,11 +54,9 @@ export function ProjectEditDialog({
   });
 
   const handleClose = (open: boolean) => {
-    if (!isLoading) {
-      onOpenChange(open);
-      if (!open) {
-        form.reset();
-      }
+    onOpenChange(open);
+    if (!open) {
+      form.reset();
     }
   };
 
@@ -91,19 +84,17 @@ export function ProjectEditDialog({
               layout="grid"
             />
 
-            <ProjectUploadProgress uploadStates={uploadStates} />
-
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => handleClose(false)}
-                disabled={isLoading}
+
               >
                 Batal
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Button type="submit" >
+
                 Simpan
               </Button>
             </div>

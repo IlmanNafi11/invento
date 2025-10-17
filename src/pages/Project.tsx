@@ -40,7 +40,7 @@ import { ProjectUploadDialog } from '@/features/project/ProjectUploadDialog';
 import { ProjectEditDialog } from '@/features/project/ProjectEditDialog';
 import { ProjectFilterDialog } from '@/features/project/ProjectFilterDialog';
 import type { ProjectListItem, ProjectCategory, ErrorResponse, ValidationErrorResponse } from '@/types';
-import type { FileUploadState } from '@/features/project/ProjectUploadProgress';
+import { useUploadManager } from '@/hooks/useUploadManager';
 
 const categoryOptions: { value: ProjectCategory | ''; label: string }[] = [
   { value: '', label: 'Semua' },
@@ -59,6 +59,7 @@ const semesterOptions: { value: string; label: string }[] = [
 export default function Project() {
   const { hasPermission } = usePermissions();
   const { projects, loading, pagination, loadProjects, deleteExistingProject } = useProject();
+  const uploadManager = useUploadManager();
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<ProjectCategory | ''>('');
@@ -72,8 +73,6 @@ export default function Project() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<ProjectListItem | null>(null);
   const [editingItem, setEditingItem] = useState<ProjectListItem | null>(null);
-  const [uploadStates, setUploadStates] = useState<FileUploadState[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [isEditLoading, setIsEditLoading] = useState(false);
 
   const debouncedSearch = useDebounce(search, 500);
@@ -134,29 +133,21 @@ export default function Project() {
       }
     }
 
-    setIsUploading(true);
-    const initialStates: FileUploadState[] = files.map((f, i) => ({
-      index: i,
-      fileName: f.file!.name,
-      progress: 0,
-      status: 'waiting',
-    }));
-    setUploadStates(initialStates);
-
     let completedCount = 0;
     let hasError = false;
 
     const fileData = files[0];
     if (!fileData.file || !fileData.category || !fileData.semester) {
-      setIsUploading(false);
       return;
     }
 
-    try {
-      setUploadStates(prev => prev.map(state =>
-        state.index === 0 ? { ...state, status: 'waiting' } : state
-      ));
+    const uploadId = uploadManager.trackUpload({
+      fileName: fileData.file.name,
+      fileType: 'file',
+    });
 
+    try {
+      uploadManager.markUploading(uploadId);
       toast.info(`Menunggu slot upload untuk ${fileData.file.name}...`);
 
       await new Promise<void>((resolve, reject) => {
@@ -171,21 +162,15 @@ export default function Project() {
           },
           {
             onProgress: (progress) => {
-              setUploadStates(prev => prev.map(state =>
-                state.index === 0 ? { ...state, progress: progress.percentage, status: 'uploading' } : state
-              ));
+              uploadManager.updateUploadProgress(uploadId, progress.percentage);
             },
             onSuccess: () => {
-              setUploadStates(prev => prev.map(state =>
-                state.index === 0 ? { ...state, progress: 100, status: 'completed' } : state
-              ));
+              uploadManager.markCompleted(uploadId);
               completedCount++;
               resolve();
             },
             onError: (error) => {
-              setUploadStates(prev => prev.map(state =>
-                state.index === 0 ? { ...state, status: 'error', error: error.message } : state
-              ));
+              uploadManager.markError(uploadId, error.message);
               toast.error(`${fileData.file!.name}: ${error.message}`);
               hasError = true;
               reject(error);
@@ -195,17 +180,13 @@ export default function Project() {
       });
     } catch (error) {
       const err = error as ErrorResponse | ValidationErrorResponse;
-      setUploadStates(prev => prev.map(state =>
-        state.index === 0 ? { ...state, status: 'error', error: err.message } : state
-      ));
+      uploadManager.markError(uploadId, err.message);
       hasError = true;
     }
 
-    setIsUploading(false);
-    
     if (!hasError && completedCount > 0) {
       setTimeout(() => {
-        setUploadStates([]);
+        uploadManager.clearCompleted();
         setIsCreateOpen(false);
         toast.success(`${completedCount} project berhasil diupload`);
         loadProjects();
@@ -245,40 +226,49 @@ export default function Project() {
           return;
         }
 
-        setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 0, status: 'waiting' }]);
+        const uploadId = uploadManager.trackUpload({
+          fileName: fileData.file!.name,
+          fileType: 'file',
+        });
 
-        toast.info(`Menunggu slot upload untuk ${fileData.file!.name}...`);
+        try {
+          uploadManager.markUploading(uploadId);
+          toast.info(`Menunggu slot upload untuk ${fileData.file!.name}...`);
 
-        await projectAPI.pollAndUpdateProjectWithChunks(
-          editingItem.id,
-          fileData.file!,
-          {
-            nama_project: fileData.name,
-            kategori: fileData.category,
-            semester: fileData.semester,
-            filename: fileData.file!.name,
-            filetype: fileData.file!.type,
-          },
-          {
-            onProgress: (progress) => {
-              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: progress.percentage, status: 'uploading' }]);
+          await projectAPI.pollAndUpdateProjectWithChunks(
+            editingItem.id,
+            fileData.file!,
+            {
+              nama_project: fileData.name,
+              kategori: fileData.category,
+              semester: fileData.semester,
+              filename: fileData.file!.name,
+              filetype: fileData.file!.type,
             },
-            onSuccess: () => {
-              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 100, status: 'completed' }]);
-              setTimeout(() => {
-                setUploadStates([]);
-                setIsEditOpen(false);
-                setEditingItem(null);
-                toast.success('Project berhasil diperbarui');
-                loadProjects();
-              }, 1000);
-            },
-            onError: (error) => {
-              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 0, status: 'error', error: error.message }]);
-              toast.error(error.message);
-            },
-          }
-        );
+            {
+              onProgress: (progress) => {
+                uploadManager.updateUploadProgress(uploadId, progress.percentage);
+              },
+              onSuccess: () => {
+                uploadManager.markCompleted(uploadId);
+                setTimeout(() => {
+                  uploadManager.clearCompleted();
+                  setIsEditOpen(false);
+                  setEditingItem(null);
+                  toast.success('Project berhasil diperbarui');
+                  loadProjects();
+                }, 1000);
+              },
+              onError: (error) => {
+                uploadManager.markError(uploadId, error.message);
+                toast.error(error.message);
+              },
+            }
+          );
+        } catch (error) {
+          const err = error as ErrorResponse | ValidationErrorResponse;
+          uploadManager.markError(uploadId, err.message || 'Upload gagal');
+        }
       }
     } catch (error) {
       const err = error as ErrorResponse | ValidationErrorResponse;
@@ -543,8 +533,6 @@ export default function Project() {
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onSubmit={handleUpload}
-        uploadStates={uploadStates}
-        isUploading={isUploading}
         categoryOptions={categoryOptions}
       />
 
@@ -553,7 +541,6 @@ export default function Project() {
         onOpenChange={setIsEditOpen}
         onSubmit={handleEdit}
         editingItem={editingItem}
-        uploadStates={uploadStates}
         isLoading={isEditLoading}
         categoryOptions={categoryOptions}
       />
