@@ -9,7 +9,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
-import { ModulUploadProgress, type FileUploadState } from './ModulUploadProgress';
 
 interface ModulForm {
   files: { file?: File; name: string; semester?: number }[];
@@ -19,7 +18,6 @@ interface ModulUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: ModulForm) => Promise<void>;
-  uploadStates: FileUploadState[];
   isUploading: boolean;
 }
 
@@ -27,7 +25,6 @@ export function ModulUploadDialog({
   open,
   onOpenChange,
   onSubmit,
-  uploadStates,
   isUploading,
 }: ModulUploadDialogProps) {
   const form = useForm<ModulForm>({
@@ -38,7 +35,7 @@ export function ModulUploadDialog({
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
-    if (uploadStates.length === 0 || uploadStates.every(s => s.status === 'completed')) {
+    if (!isUploading) {
       form.reset();
     }
   });
@@ -74,8 +71,6 @@ export function ModulUploadDialog({
               addButtonLabel="Tambah Modul Lain"
               layout="grid"
             />
-
-            <ModulUploadProgress uploadStates={uploadStates} />
 
             <div className="flex justify-end gap-2">
               <Button

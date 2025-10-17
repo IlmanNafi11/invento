@@ -7,6 +7,8 @@ import profileReducer from './profileSlice'
 import modulReducer from './modulSlice'
 import projectReducer from './projectSlice'
 import permissionReducer from './permissionSlice'
+import uploadReducer from './uploadSlice'
+import { default as tusReducer } from './tus/tusSlice'
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +20,8 @@ export const store = configureStore({
     modul: modulReducer,
     project: projectReducer,
     permission: permissionReducer,
+    upload: uploadReducer,
+    tus: tusReducer,
   },
 })
 

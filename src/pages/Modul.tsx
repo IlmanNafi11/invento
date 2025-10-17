@@ -35,12 +35,12 @@ import { formatDate } from '@/utils/format';
 import { useDebounce } from '@/hooks/useDebounce';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useModul } from '@/hooks/useModul';
+import { useUploadManager } from '@/hooks/useUploadManager';
 import { modulAPI } from '@/lib/modulAPI';
 import { ModulUploadDialog } from '@/features/modul/ModulUploadDialog';
 import { ModulEditDialog } from '@/features/modul/ModulEditDialog';
 import { ModulFilterDialog } from '@/features/modul/ModulFilterDialog';
 import type { ModulListItem, ErrorResponse, ValidationErrorResponse } from '@/types';
-import type { FileUploadState } from '@/features/modul/ModulUploadProgress';
 
 const fileTypeOptions = [
   { value: 'all', label: 'Semua' },
@@ -58,6 +58,7 @@ const semesterOptions = [
 export default function Modul() {
   const { hasPermission } = usePermissions();
   const { moduls, pagination, loading, loadModuls, deleteExistingModul } = useModul();
+  const uploadManager = useUploadManager();
 
   const [search, setSearch] = useState('');
   const [fileType, setFileType] = useState('all');
@@ -71,7 +72,6 @@ export default function Modul() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<ModulListItem | null>(null);
   const [editingItem, setEditingItem] = useState<ModulListItem | null>(null);
-  const [uploadStates, setUploadStates] = useState<FileUploadState[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isEditLoading, setIsEditLoading] = useState(false);
 
@@ -139,39 +139,37 @@ export default function Modul() {
     }
 
     setIsUploading(true);
-    const initialStates: FileUploadState[] = files.map((f, i) => ({
-      index: i,
-      fileName: f.file!.name,
-      progress: 0,
-      status: 'waiting',
-    }));
-    setUploadStates(initialStates);
 
     try {
-      await modulAPI.uploadMultipleModuls(
-        files.map(f => f.file!),
-        files.map(f => f.name),
-        files.map(f => f.semester!),
-        (fileIndex, progress) => {
-          setUploadStates(prev => prev.map(state =>
-            state.index === fileIndex ? { ...state, progress, status: 'uploading' } : state
-          ));
-        },
-        (fileIndex) => {
-          setUploadStates(prev => prev.map(state =>
-            state.index === fileIndex ? { ...state, progress: 100, status: 'completed' } : state
-          ));
-        },
-        (fileIndex, error) => {
-          setUploadStates(prev => prev.map(state =>
-            state.index === fileIndex ? { ...state, status: 'error', error: error.message } : state
-          ));
-          toast.error(`${files[fileIndex].file!.name}: ${error.message}`);
-        }
-      );
+      const uploadPromises = files.map((fileData) => {
+        const uploadId = uploadManager.trackUpload({
+          fileName: fileData.file!.name,
+          fileType: modulAPI.getFileType(fileData.file!),
+        });
+
+        uploadManager.markUploading(uploadId);
+
+        return modulAPI.uploadMultipleModuls(
+          [fileData.file!],
+          [fileData.name],
+          [fileData.semester!],
+          (_, progress) => {
+            uploadManager.updateUploadProgress(uploadId, progress);
+          },
+          () => {
+            uploadManager.markCompleted(uploadId);
+          },
+          (_, error) => {
+            uploadManager.markError(uploadId, error.message);
+            toast.error(`${fileData.file!.name}: ${error.message}`);
+          }
+        );
+      });
+
+      await Promise.all(uploadPromises);
 
       setTimeout(() => {
-        setUploadStates([]);
+        uploadManager.clearCompleted();
         setIsCreateOpen(false);
         setIsUploading(false);
         toast.success('Upload selesai');
@@ -210,7 +208,12 @@ export default function Modul() {
           return;
         }
 
-        setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 0, status: 'waiting' }]);
+        const uploadId = uploadManager.trackUpload({
+          fileName: fileData.file!.name,
+          fileType,
+        });
+
+        uploadManager.markUploading(uploadId);
 
         await modulAPI.pollAndUpdateModulWithChunks(
           editingItem.id,
@@ -222,12 +225,12 @@ export default function Modul() {
           },
           {
             onProgress: (progress) => {
-              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: progress.percentage, status: 'uploading' }]);
+              uploadManager.updateUploadProgress(uploadId, progress.percentage);
             },
             onSuccess: () => {
-              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 100, status: 'completed' }]);
+              uploadManager.markCompleted(uploadId);
               setTimeout(() => {
-                setUploadStates([]);
+                uploadManager.removeUploadItem(uploadId);
                 setIsEditOpen(false);
                 setEditingItem(null);
                 toast.success('Modul berhasil diperbarui');
@@ -235,7 +238,7 @@ export default function Modul() {
               }, 1000);
             },
             onError: (error) => {
-              setUploadStates([{ index: 0, fileName: fileData.file!.name, progress: 0, status: 'error', error: error.message }]);
+              uploadManager.markError(uploadId, error.message);
               toast.error(error.message);
             },
           }
@@ -503,7 +506,6 @@ export default function Modul() {
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onSubmit={handleUpload}
-        uploadStates={uploadStates}
         isUploading={isUploading}
       />
 
@@ -512,7 +514,6 @@ export default function Modul() {
         onOpenChange={setIsEditOpen}
         onSubmit={handleEdit}
         editingItem={editingItem}
-        uploadStates={uploadStates}
         isLoading={isEditLoading}
       />
 

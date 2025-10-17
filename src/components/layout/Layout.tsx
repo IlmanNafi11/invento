@@ -15,6 +15,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { setSidebarOpen } from "@/lib/sidebarSlice";
 import { logout } from "@/lib/authSlice";
 import { ProfileDialog } from "@/components/common/ProfileDialog";
+import { UploadProgressIndicator } from "@/components/common/UploadProgressIndicator";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 
@@ -77,6 +78,7 @@ export default function Layout() {
         onOpenChange={setProfileOpen}
         onProfileUpdate={handleProfileUpdate}
       />
+      <UploadProgressIndicator />
     </SidebarProvider>
   );
 }

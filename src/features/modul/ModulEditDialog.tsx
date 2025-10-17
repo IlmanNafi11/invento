@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
-import { ModulUploadProgress, type FileUploadState } from './ModulUploadProgress';
 import type { ModulListItem } from '@/types';
 
 interface ModulForm {
@@ -22,7 +21,6 @@ interface ModulEditDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: ModulForm) => Promise<void>;
   editingItem: ModulListItem | null;
-  uploadStates: FileUploadState[];
   isLoading: boolean;
 }
 
@@ -31,7 +29,6 @@ export function ModulEditDialog({
   onOpenChange,
   onSubmit,
   editingItem,
-  uploadStates,
   isLoading,
 }: ModulEditDialogProps) {
   const form = useForm<ModulForm>({
@@ -86,8 +83,6 @@ export function ModulEditDialog({
               fileLabel="File Modul"
               layout="grid"
             />
-
-            <ModulUploadProgress uploadStates={uploadStates} />
 
             <div className="flex justify-end gap-2">
               <Button
