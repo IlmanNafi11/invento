@@ -26,16 +26,7 @@ export const initializeAuth = createAsyncThunk<
   { access_token: string } | null,
   void
 >('auth/initializeAuth', async () => {
-  try {
-    const response = await authAPI.refreshToken();
-    return {
-      access_token: response.data.access_token,
-    };
-  } catch {
-    // Silently handle initialization errors (no session, refresh token invalid, etc)
-    // This is expected behavior when user first visits without valid session
-    return null;
-  }
+  return null;
 });
 
 export const login = createAsyncThunk<
@@ -143,10 +134,14 @@ const authSlice = createSlice({
     setAccessToken: (state, action: PayloadAction<string>) => {
       state.accessToken = action.payload;
     },
+    setInitializingAuth: (state, action: PayloadAction<boolean>) => {
+      state.initializingAuth = action.payload;
+    },
     clearAuthState: (state) => {
       state.user = null;
       state.accessToken = null;
       state.isAuthenticated = false;
+      state.initializingAuth = false;
       state.error = null;
       
       import('./tokenRefreshManager').then(({ tokenRefreshManager }) => {
@@ -247,5 +242,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setAccessToken, clearAuthState, clearError } = authSlice.actions;
+export const { setAccessToken, setInitializingAuth, clearAuthState, clearError } = authSlice.actions;
 export default authSlice.reducer;
