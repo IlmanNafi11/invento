@@ -99,6 +99,30 @@ export const confirmResetPasswordOTP = createAsyncThunk<
   }
 });
 
+interface VerifyRegisterOTPPayload {
+  email: string;
+  code: string;
+}
+
+export const verifyRegisterOTP = createAsyncThunk<
+  AuthSuccessResponse,
+  VerifyRegisterOTPPayload,
+  { rejectValue: string }
+>('auth/verifyRegisterOTP', async (payload, { rejectWithValue, dispatch }) => {
+  try {
+    dispatch(clearProfile());
+    const response = await authAPI.verifyRegisterOTP({
+      email: payload.email,
+      code: payload.code,
+      type: 'register',
+    });
+    return response;
+  } catch (error) {
+    const errorInfo = handleAPIError(error);
+    return rejectWithValue(errorInfo.message);
+  }
+});
+
 export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
   try {
     await authAPI.logout();
@@ -197,6 +221,21 @@ const authSlice = createSlice({
       .addCase(confirmResetPasswordOTP.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Reset password gagal';
+      })
+      .addCase(verifyRegisterOTP.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyRegisterOTP.fulfilled, (state, action: PayloadAction<AuthSuccessResponse>) => {
+        state.loading = false;
+        state.user = action.payload.data.user;
+        state.accessToken = action.payload.data.access_token;
+        state.isAuthenticated = true;
+        state.error = null;
+      })
+      .addCase(verifyRegisterOTP.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Verifikasi OTP gagal';
       })
       .addCase(logout.fulfilled, (state) => {
         state.user = null;

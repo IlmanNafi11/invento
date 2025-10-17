@@ -1,7 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,8 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useAuthRedirect } from "@/hooks/useAuthRedirect";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useRegisterOTP } from "@/hooks/useRegisterOTP";
+import { useAppDispatch } from "@/hooks/useAppDispatch";
+import { verifyRegisterOTP } from "@/lib/authSlice";
 import { WaveBackground } from "@/components/common/WaveBackground";
+import { RegisterOTPDialog } from "@/components/common/RegisterOTPDialog";
 
 const registerSchema = z
   .object({
@@ -34,10 +39,26 @@ const registerSchema = z
   });
 
 type RegisterForm = z.infer<typeof registerSchema>;
+type RegisterStep = 'idle' | 'otp' | 'success';
 
 export default function Register() {
-  const { register: registerUser, loading, error, clearError } = useAuth();
-  useAuthRedirect();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, clearError: clearAuthError } = useAuth();
+  const { loading: permissionsLoading } = usePermissions();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [registerStep, setRegisterStep] = useState<RegisterStep>('idle');
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerOtpExpiresIn, setRegisterOtpExpiresIn] = useState(600);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    initiateRegisterOTP,
+    resendRegisterOTP,
+    loading: registerOTPLoading,
+  } = useRegisterOTP();
 
   const {
     register,
@@ -52,15 +73,87 @@ export default function Register() {
   const passwordField = register("password");
   const confirmPasswordField = register("confirmPassword");
 
+  const from = location.state?.from?.pathname || "/dashboard";
+
+  useEffect(() => {
+    if (isAuthenticated && !isRedirecting) {
+      setIsRedirecting(true);
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from, isRedirecting]);
+
   const onSubmit = async (data: RegisterForm) => {
+    setFormError(null);
     const registerData = { name: data.name, email: data.email, password: data.password };
-    await registerUser(registerData);
+    
+    const result = await initiateRegisterOTP(registerData);
+    if (result.success) {
+      setRegisterEmail(data.email);
+      setRegisterOtpExpiresIn(result.expiresIn || 600);
+      setRegisterStep('otp');
+      setOtpDialogOpen(true);
+    } else {
+      setFormError(result.error || 'Gagal mengirim OTP');
+    }
   };
 
   const handleInputChange = () => {
-    if (error) {
-      clearError();
+    if (formError) {
+      setFormError(null);
     }
+    clearAuthError();
+  };
+
+  const handleOTPSubmit = async (code: string) => {
+    try {
+      await dispatch(verifyRegisterOTP({
+        email: registerEmail,
+        code,
+      })).unwrap();
+
+      setRegisterStep('success');
+      setOtpDialogOpen(false);
+
+      const maxWaitTime = 5000;
+      const startTime = Date.now();
+
+      const waitForPermissionsReady = () => {
+        return new Promise<void>((resolve) => {
+          const checkPermissions = () => {
+            const elapsed = Date.now() - startTime;
+
+            if (!permissionsLoading || elapsed > maxWaitTime) {
+              resolve();
+            } else {
+              setTimeout(checkPermissions, 100);
+            }
+          };
+
+          checkPermissions();
+        });
+      };
+
+      await waitForPermissionsReady();
+
+      setRegisterStep('idle');
+      navigate(from, { replace: true });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Gagal verifikasi OTP';
+      throw new Error(errorMessage);
+    }
+  };
+
+  const handleOTPResend = async () => {
+    const result = await resendRegisterOTP(registerEmail);
+    if (!result.success) {
+      throw new Error(result.error || 'Gagal mengirim ulang OTP');
+    }
+  };
+
+  const handleCloseOTPDialog = () => {
+    setRegisterStep('idle');
+    setOtpDialogOpen(false);
+    setRegisterEmail('');
   };
 
   return (
@@ -78,9 +171,9 @@ export default function Register() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {error && (
+            {formError && (
               <Alert variant="destructive" className="border-red-500/40 bg-red-500/15 text-red-200">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{formError}</AlertDescription>
               </Alert>
             )}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -154,12 +247,17 @@ export default function Register() {
               <Button
                 type="submit"
                 className="w-full bg-white text-gray-900 hover:bg-white/90"
-                disabled={loading}
+                disabled={registerOTPLoading || isRedirecting}
               >
-                {loading ? (
+                {registerOTPLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Mendaftar...
+                    Mengirim OTP...
+                  </>
+                ) : isRedirecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sedang mengarahkan...
                   </>
                 ) : (
                   "Daftar"
@@ -175,6 +273,19 @@ export default function Register() {
           </CardContent>
         </Card>
       </div>
+
+      <RegisterOTPDialog
+        open={otpDialogOpen && registerStep === 'otp'}
+        onOpenChange={(open) => {
+          if (!open) handleCloseOTPDialog();
+          else setOtpDialogOpen(true);
+        }}
+        onSubmit={handleOTPSubmit}
+        onResend={handleOTPResend}
+        loading={registerOTPLoading}
+        initialExpiresIn={registerOtpExpiresIn}
+        email={registerEmail}
+      />
     </div>
   );
 }

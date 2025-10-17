@@ -5,6 +5,7 @@ import type {
   AuthSuccessResponse,
   RefreshTokenSuccessResponse,
   SuccessResponse,
+  OTPResponse,
 } from '@/types';
 
 interface ResetPasswordOTPRequest {
@@ -59,6 +60,18 @@ class AuthAPIClient extends APIClient {
 
   async resendResetPasswordOTP(data: ResendOTPRequest): Promise<SuccessResponse> {
     return this.post<SuccessResponse>('/auth/reset-password/resend-otp', data, { skipAuth: true });
+  }
+
+  async registerWithOTP(data: RegisterRequest): Promise<OTPResponse> {
+    return this.post<OTPResponse>('/auth/register/otp', data, { skipAuth: true });
+  }
+
+  async verifyRegisterOTP(data: VerifyResetPasswordOTPRequest): Promise<AuthSuccessResponse> {
+    return this.post<AuthSuccessResponse>('/auth/register/verify-otp', data, { skipAuth: true });
+  }
+
+  async resendRegisterOTP(data: ResendOTPRequest): Promise<OTPResponse> {
+    return this.post<OTPResponse>('/auth/register/resend-otp', data, { skipAuth: true });
   }
 }
 

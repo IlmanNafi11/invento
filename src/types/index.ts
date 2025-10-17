@@ -391,6 +391,13 @@ export interface ResetPasswordOTPInitResponse extends BaseResponse {
   };
 }
 
+export interface OTPResponse extends BaseResponse {
+  data: {
+    message: string;
+    expires_in: number;
+  };
+}
+
 export interface VerifyOTPResponse extends BaseResponse {
   data?: {
     message: string;
