@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/hooks/useAppDispatch';
-import { removeUpload, clearCompletedUploads } from '@/lib/uploadSlice';
+import { removeUpload, clearCompletedUploads, cancelUpload } from '@/lib/uploadSlice';
 
 export function UploadProgressIndicator() {
   const dispatch = useAppDispatch();
@@ -90,9 +90,17 @@ export function UploadProgressIndicator() {
                       {upload.status === 'cancelled' && 'Dibatalkan'}
                     </p>
                   </div>
-                  {(upload.status === 'completed' ||
-                    upload.status === 'error' ||
-                    upload.status === 'cancelled') && (
+                  {upload.status === 'uploading' || upload.status === 'waiting' ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => dispatch(cancelUpload({ id: upload.id }))}
+                      className="h-6 w-6 p-0 hover:bg-destructive/10"
+                      title="Batalkan upload"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  ) : (
                     <Button
                       variant="ghost"
                       size="sm"

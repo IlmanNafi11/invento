@@ -148,6 +148,7 @@ export default function Modul() {
         });
 
         uploadManager.markUploading(uploadId);
+        setIsCreateOpen(false);
 
         return modulAPI.uploadMultipleModuls(
           [fileData.file!],
@@ -170,7 +171,6 @@ export default function Modul() {
 
       setTimeout(() => {
         uploadManager.clearCompleted();
-        setIsCreateOpen(false);
         setIsUploading(false);
         toast.success('Upload selesai');
         loadModuls();
@@ -214,6 +214,7 @@ export default function Modul() {
         });
 
         uploadManager.markUploading(uploadId);
+        setIsEditOpen(false);
 
         await modulAPI.pollAndUpdateModulWithChunks(
           editingItem.id,
@@ -231,7 +232,6 @@ export default function Modul() {
               uploadManager.markCompleted(uploadId);
               setTimeout(() => {
                 uploadManager.removeUploadItem(uploadId);
-                setIsEditOpen(false);
                 setEditingItem(null);
                 toast.success('Modul berhasil diperbarui');
                 loadModuls();

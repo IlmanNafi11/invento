@@ -148,7 +148,7 @@ export default function Project() {
 
     try {
       uploadManager.markUploading(uploadId);
-      toast.info(`Menunggu slot upload untuk ${fileData.file.name}...`);
+      setIsCreateOpen(false);
 
       await new Promise<void>((resolve, reject) => {
         projectAPI.pollAndUploadProjectWithChunks(
@@ -233,7 +233,7 @@ export default function Project() {
 
         try {
           uploadManager.markUploading(uploadId);
-          toast.info(`Menunggu slot upload untuk ${fileData.file!.name}...`);
+          setIsEditOpen(false);
 
           await projectAPI.pollAndUpdateProjectWithChunks(
             editingItem.id,
@@ -252,8 +252,6 @@ export default function Project() {
               onSuccess: () => {
                 uploadManager.markCompleted(uploadId);
                 setTimeout(() => {
-                  uploadManager.clearCompleted();
-                  setIsEditOpen(false);
                   setEditingItem(null);
                   toast.success('Project berhasil diperbarui');
                   loadProjects();
