@@ -15,6 +15,7 @@ import {
   TUSErrorHandler,
   TUSErrorType,
 } from './tus';
+import { validateModulFile } from '@/utils/fileValidation';
 
 export interface ModulUpdateMetadataRequest {
   nama_file: string;
@@ -57,25 +58,7 @@ class ModulAPIClient extends APIClient {
   }
 
   validateModulFile(file: File): { valid: boolean; error?: string } {
-    const MAX_FILE_SIZE = 50 * 1024 * 1024;
-    const ALLOWED_TYPES = ['docx', 'xlsx', 'pdf', 'pptx'];
-
-    if (file.size > MAX_FILE_SIZE) {
-      return {
-        valid: false,
-        error: 'Ukuran file modul tidak boleh lebih dari 50MB',
-      };
-    }
-
-    const fileType = this.getFileType(file);
-    if (!ALLOWED_TYPES.includes(fileType)) {
-      return {
-        valid: false,
-        error: 'Tipe file tidak didukung. Hanya .docx, .xlsx, .pdf, dan .pptx yang diperbolehkan',
-      };
-    }
-
-    return { valid: true };
+    return validateModulFile(file);
   }
 
   validateModulMetadata(metadata: Partial<ModulMetadata>): { valid: boolean; errors?: string[] } {

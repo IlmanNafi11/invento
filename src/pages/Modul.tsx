@@ -119,23 +119,12 @@ export default function Modul() {
   const handleUpload = async (data: { files: { file?: File; name: string; semester?: number }[] }) => {
     const files = data.files.filter(f => f.file && f.name && f.semester);
     if (files.length === 0) {
-      toast.error('Harap lengkapi nama file dan semester');
       return;
     }
 
     if (files.length > 5) {
       toast.error('Maksimal 5 file per upload');
       return;
-    }
-
-    for (const fileData of files) {
-      if (fileData.file) {
-        const validation = modulAPI.validateModulFile(fileData.file);
-        if (!validation.valid) {
-          toast.error(`${fileData.file.name}: ${validation.error}`);
-          return;
-        }
-      }
     }
 
     setIsUploading(true);

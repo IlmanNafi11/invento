@@ -1,4 +1,5 @@
 import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
 import type { ProjectCategory } from '@/types';
+import { validateProjectFile } from '@/utils/fileValidation';
 
 interface ProjectForm {
   files: { file?: File; name: string; category?: ProjectCategory; semester?: number }[];
@@ -34,6 +36,40 @@ export function ProjectUploadDialog({
   });
 
   const handleSubmit = form.handleSubmit(async (data) => {
+    const errors: string[] = [];
+    const fileData = data.files[0];
+    
+    if (!fileData) {
+      toast.error('Data project tidak valid');
+      return;
+    }
+    
+    if (!fileData.name || fileData.name.trim() === '') {
+      errors.push('Nama project tidak boleh kosong');
+    }
+    
+    if (!fileData.category) {
+      errors.push('Kategori harus dipilih');
+    }
+    
+    if (!fileData.semester) {
+      errors.push('Semester harus dipilih');
+    }
+    
+    if (!fileData.file) {
+      errors.push('File project harus diisi');
+    } else {
+      const validation = validateProjectFile(fileData.file);
+      if (!validation.valid) {
+        errors.push(validation.error || 'File tidak valid');
+      }
+    }
+    
+    if (errors.length > 0) {
+      toast.error(errors.join(', '));
+      return;
+    }
+    
     await onSubmit(data);
   });
 

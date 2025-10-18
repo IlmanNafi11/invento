@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FileInput } from '@/components/common/FileInput';
 import type { ModulListItem } from '@/types';
+import { validateModulFile } from '@/utils/fileValidation';
 
 interface ModulForm {
   files: { file?: File; name: string; semester?: number; existingFileSize?: string }[];
@@ -49,6 +51,34 @@ export function ModulEditDialog({
   }, [editingItem, open, form]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
+    const errors: string[] = [];
+    const fileData = data.files[0];
+    
+    if (!fileData) {
+      toast.error('Data modul tidak valid');
+      return;
+    }
+    
+    if (!fileData.name || fileData.name.trim() === '') {
+      errors.push('Nama modul tidak boleh kosong');
+    }
+    
+    if (!fileData.semester) {
+      errors.push('Semester harus dipilih');
+    }
+    
+    if (fileData.file && fileData.file.size > 0) {
+      const validation = validateModulFile(fileData.file);
+      if (!validation.valid) {
+        errors.push(validation.error || 'File tidak valid');
+      }
+    }
+    
+    if (errors.length > 0) {
+      toast.error(errors.join(', '));
+      return;
+    }
+    
     await onSubmit(data);
   });
 

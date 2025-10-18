@@ -15,6 +15,7 @@ import type {
   ProjectUpdateMetadataRequest,
   ProjectUpdateMetadataResponse,
 } from '@/types';
+import { validateProjectFile } from '@/utils/fileValidation';
 
 export interface ProjectUploadCallbacks {
   onProgress: (progress: { percentage: number; bytesUploaded: number; bytesTotal: number; speed: number; eta: number }) => void;
@@ -33,32 +34,7 @@ class ProjectAPIClient extends APIClient {
   }
 
   validateProjectFile(file: File): { valid: boolean; error?: string } {
-    const MAX_FILE_SIZE = 500 * 1024 * 1024;
-    const ALLOWED_TYPES = ['zip'];
-
-    if (file.size > MAX_FILE_SIZE) {
-      return {
-        valid: false,
-        error: 'Ukuran file project tidak boleh lebih dari 500MB',
-      };
-    }
-
-    if (file.size === 0) {
-      return {
-        valid: false,
-        error: 'File tidak boleh kosong',
-      };
-    }
-
-    const fileExt = file.name.toLowerCase().split('.').pop() || '';
-    if (!ALLOWED_TYPES.includes(fileExt)) {
-      return {
-        valid: false,
-        error: 'Format file harus ZIP',
-      };
-    }
-
-    return { valid: true };
+    return validateProjectFile(file);
   }
 
   validateProjectMetadata(metadata: Partial<ProjectMetadata>): { valid: boolean; errors?: string[] } {

@@ -119,18 +119,7 @@ export default function Project() {
   const handleUpload = async (data: { files: { file?: File; name: string; category?: ProjectCategory; semester?: number }[] }) => {
     const files = data.files.filter(f => f.file && f.name && f.category && f.semester);
     if (files.length === 0) {
-      toast.error('Harap lengkapi nama project, kategori, dan semester');
       return;
-    }
-
-    for (const fileData of files) {
-      if (fileData.file) {
-        const validation = projectAPI.validateProjectFile(fileData.file);
-        if (!validation.valid) {
-          toast.error(`${fileData.file.name}: ${validation.error}`);
-          return;
-        }
-      }
     }
 
     let completedCount = 0;
