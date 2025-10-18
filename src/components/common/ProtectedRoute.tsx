@@ -20,7 +20,7 @@ export default function ProtectedRoute({ children, requiredPermission, requiredP
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const initializingAuth = useAppSelector((state) => state.auth.initializingAuth);
   const location = useLocation();
-  const { hasPermission, loading } = usePermissions();
+  const { hasPermission, loading, permissions } = usePermissions();
 
   if (initializingAuth) {
     return (
@@ -36,7 +36,7 @@ export default function ProtectedRoute({ children, requiredPermission, requiredP
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if ((requiredPermission || requiredPermissions) && loading) {
+  if ((requiredPermission || requiredPermissions) && (loading || permissions.length === 0)) {
     return (
       <LoadingOverlay
         show={true}
@@ -48,7 +48,8 @@ export default function ProtectedRoute({ children, requiredPermission, requiredP
 
   if (requiredPermission) {
     const { resource, action } = requiredPermission;
-    if (!hasPermission(resource, action)) {
+    const allowed = hasPermission(resource, action);
+    if (!allowed) {
       return <Navigate to="/forbidden" replace />;
     }
   }

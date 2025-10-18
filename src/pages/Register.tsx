@@ -16,10 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { usePermissions } from "@/hooks/usePermissions";
 import { useRegisterOTP } from "@/hooks/useRegisterOTP";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { verifyRegisterOTP } from "@/lib/authSlice";
+import { fetchProfile } from "@/lib/profileSlice";
+import { fetchPermissions } from "@/lib/permissionSlice";
 import { WaveBackground } from "@/components/common/WaveBackground";
 import { RegisterOTPDialog } from "@/components/common/RegisterOTPDialog";
 
@@ -46,7 +47,6 @@ export default function Register() {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { isAuthenticated, clearError: clearAuthError } = useAuth();
-  const { loading: permissionsLoading } = usePermissions();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [registerStep, setRegisterStep] = useState<RegisterStep>('idle');
   const [otpDialogOpen, setOtpDialogOpen] = useState(false);
@@ -113,30 +113,13 @@ export default function Register() {
         code,
       })).unwrap();
 
+      await Promise.all([
+        dispatch(fetchProfile()),
+        dispatch(fetchPermissions())
+      ]);
+
       setRegisterStep('success');
       setOtpDialogOpen(false);
-
-      const maxWaitTime = 5000;
-      const startTime = Date.now();
-
-      const waitForPermissionsReady = () => {
-        return new Promise<void>((resolve) => {
-          const checkPermissions = () => {
-            const elapsed = Date.now() - startTime;
-
-            if (!permissionsLoading || elapsed > maxWaitTime) {
-              resolve();
-            } else {
-              setTimeout(checkPermissions, 100);
-            }
-          };
-
-          checkPermissions();
-        });
-      };
-
-      await waitForPermissionsReady();
-
       setRegisterStep('idle');
       navigate(from, { replace: true });
     } catch (err) {

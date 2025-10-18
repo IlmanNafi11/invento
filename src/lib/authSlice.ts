@@ -25,9 +25,18 @@ const initialState: AuthState = {
 
 export const initializeAuth = createAsyncThunk<
   { access_token: string } | null,
-  void
->('auth/initializeAuth', async () => {
-  return null;
+  void,
+  { rejectValue: string }
+>('auth/initializeAuth', async (_, { rejectWithValue }) => {
+  try {
+    const response = await authAPI.refreshToken();
+    return { access_token: response.data.access_token };
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 400) {
+      return null;
+    }
+    return rejectWithValue('Failed to restore session');
+  }
 });
 
 export const login = createAsyncThunk<
@@ -161,12 +170,14 @@ const authSlice = createSlice({
         } else {
           state.accessToken = null;
           state.isAuthenticated = false;
+          state.user = null;
         }
       })
       .addCase(initializeAuth.rejected, (state) => {
         state.initializingAuth = false;
         state.accessToken = null;
         state.isAuthenticated = false;
+        state.user = null;
       })
       .addCase(login.pending, (state) => {
         state.loading = true;

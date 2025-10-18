@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { usePermissions } from "@/hooks/usePermissions";
 import { useForgotPassword } from "@/hooks/useForgotPassword";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { confirmResetPasswordOTP } from "@/lib/authSlice";
+import { fetchProfile } from "@/lib/profileSlice";
+import { fetchPermissions } from "@/lib/permissionSlice";
 import { WaveBackground } from "@/components/common/WaveBackground";
 import { ForgotPasswordDialog } from "@/components/common/ForgotPasswordDialog";
 import { OTPVerificationDialog } from "@/components/common/OTPVerificationDialog";
@@ -34,7 +35,6 @@ export default function Login() {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { login: loginUser, loading, error, isAuthenticated, clearError } = useAuth();
-  const { loading: permissionsLoading } = usePermissions();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -130,30 +130,13 @@ export default function Login() {
         new_password: newPassword,
       })).unwrap();
       
+      await Promise.all([
+        dispatch(fetchProfile()),
+        dispatch(fetchPermissions())
+      ]);
+      
       setForgotPasswordStep('success');
       setPasswordResetDialogOpen(false);
-
-      const maxWaitTime = 5000;
-      const startTime = Date.now();
-      
-      const waitForPermissionsReady = () => {
-        return new Promise<void>((resolve) => {
-          const checkPermissions = () => {
-            const elapsed = Date.now() - startTime;
-            
-            if (!permissionsLoading || elapsed > maxWaitTime) {
-              resolve();
-            } else {
-              setTimeout(checkPermissions, 100);
-            }
-          };
-          
-          checkPermissions();
-        });
-      };
-
-      await waitForPermissionsReady();
-      
       setForgotPasswordStep('idle');
       navigate(from, { replace: true });
     } catch (err) {
@@ -183,19 +166,13 @@ export default function Login() {
         secondary: "Mengamankan akses dan menyiapkan sesi Anda",
       };
     }
-    if (permissionsLoading) {
-      return {
-        primary: "Memuat izin terbaru",
-        secondary: "Menyesuaikan fitur sesuai peran Anda",
-      };
-    }
     return {
       primary: "Menyiapkan Invento",
       secondary: "Mohon tunggu sebentar...",
     };
-  }, [isRedirecting, loading, permissionsLoading]);
+  }, [isRedirecting, loading]);
 
-  const shouldShowOverlay = loading || permissionsLoading || isRedirecting;
+  const shouldShowOverlay = loading || isRedirecting;
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#060509] px-6 py-12">
