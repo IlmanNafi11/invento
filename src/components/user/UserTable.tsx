@@ -1,12 +1,4 @@
 import { Eye, Edit, Trash2 } from 'lucide-react';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
-  type ColumnDef,
-  flexRender,
-} from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -25,10 +17,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
+import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatDate } from '@/utils/format';
 import { UserTableHeader } from './UserTableHeader';
-import type { UserItem, RoleListItem } from '@/types';
+import type { UserItem, Pagination as PaginationType, RoleListItem } from '@/types';
 import type { UseFormReturn } from 'react-hook-form';
 
 interface FilterForm {
@@ -37,7 +30,7 @@ interface FilterForm {
 
 interface UserTableProps {
   users: UserItem[];
-  totalUsers: number;
+  pagination: PaginationType | null;
   search: string;
   onSearchChange: (value: string) => void;
   filterForm: UseFormReturn<FilterForm>;
@@ -49,11 +42,16 @@ interface UserTableProps {
   onView: (user: UserItem) => void;
   onEdit: (user: UserItem) => void;
   onDelete: (user: UserItem) => void;
+  loading: boolean;
+  onPageChange: (page: number) => void;
 }
+
+const SKELETON_ROWS = 10;
+const COLUMNS = 4;
 
 export function UserTable({
   users,
-  totalUsers,
+  pagination,
   search,
   onSearchChange,
   filterForm,
@@ -65,70 +63,98 @@ export function UserTable({
   onView,
   onEdit,
   onDelete,
+  loading,
+  onPageChange,
 }: UserTableProps) {
-  const userColumns: ColumnDef<UserItem>[] = [
-    {
-      accessorKey: 'email',
-      header: 'Email',
-    },
-    {
-      accessorKey: 'role.name',
-      header: 'Role',
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Dibuat Pada',
-      cell: ({ getValue }) => formatDate(new Date(getValue<string>())),
-    },
-    {
-      id: 'actions',
-      header: () => <div className="text-center">Aksi</div>,
-      cell: ({ row }) => (
-        <div className="flex gap-2 justify-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onView(row.original)}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          {canUpdate && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onEdit(row.original)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-          )}
-          {canDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(row.original)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
+  const renderSkeletonRows = () => {
+    return Array.from({ length: SKELETON_ROWS }).map((_, index) => (
+      <TableRow key={`skeleton-${index}`}>
+        <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+        <TableCell className="text-center">
+          <div className="flex gap-2 justify-center">
+            <Skeleton className="h-8 w-8 rounded" />
+            <Skeleton className="h-8 w-8 rounded" />
+            <Skeleton className="h-8 w-8 rounded" />
+          </div>
+        </TableCell>
+      </TableRow>
+    ));
+  };
 
-  const userTable = useReactTable({
-    data: users,
-    columns: userColumns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-  });
+  const renderUsers = () => {
+    if (loading) {
+      return renderSkeletonRows();
+    }
+
+    if (users.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={COLUMNS} className="p-0 border-0">
+            <EmptyState
+              title="Belum ada user"
+              description="Belum ada user yang terdaftar"
+            />
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return users.map((user) => (
+      <TableRow key={user.id}>
+        <TableCell>{user.email}</TableCell>
+        <TableCell>{user.role.name}</TableCell>
+        <TableCell>{formatDate(new Date(user.createdAt))}</TableCell>
+        <TableCell className="text-center">
+          <div className="flex gap-2 justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onView(user)}
+              disabled={loading}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            {canUpdate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEdit(user)}
+                disabled={loading}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete(user)}
+                disabled={loading}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    ));
+  };
+
+  const currentPage = pagination?.page || 1;
+  const totalPages = pagination?.total_pages || 1;
+  const totalItems = pagination?.total_items || 0;
+
+  const canPreviousPage = currentPage > 1;
+  const canNextPage = currentPage < totalPages;
 
   return (
     <div className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead colSpan={userColumns.length}>
+            <TableHead colSpan={COLUMNS}>
               <UserTableHeader
                 search={search}
                 onSearchChange={onSearchChange}
@@ -139,61 +165,38 @@ export function UserTable({
               />
             </TableHead>
           </TableRow>
-          {userTable.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="bg-muted/50">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
+          <TableRow className="bg-muted/50">
+            <TableHead>Email</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Dibuat Pada</TableHead>
+            <TableHead className="text-center">Aksi</TableHead>
+          </TableRow>
         </TableHeader>
         <TableBody>
-          {userTable.getRowModel().rows?.length ? (
-            userTable.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={userColumns.length} className="p-0 border-0">
-                <EmptyState
-                  title="Belum ada user"
-                  description="Belum ada user yang terdaftar"
-                />
-              </TableCell>
-            </TableRow>
-          )}
+          {renderUsers()}
         </TableBody>
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={userColumns.length} className="text-center">
+            <TableCell colSpan={COLUMNS} className="text-center">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  Menampilkan {userTable.getFilteredRowModel().rows.length} dari {totalUsers} data
+                  Menampilkan {users.length} dari {totalItems} data
                 </div>
                 <div className="space-x-2">
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious
-                          onClick={() => userTable.previousPage()}
-                          className={userTable.getCanPreviousPage() ? '' : 'pointer-events-none opacity-50'}
+                          onClick={() => onPageChange(currentPage - 1)}
+                          className={canPreviousPage ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
                         />
                       </PaginationItem>
-                      {Array.from({ length: userTable.getPageCount() }, (_, i) => i + 1).map((page) => (
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                         <PaginationItem key={page}>
                           <PaginationLink
-                            onClick={() => userTable.setPageIndex(page - 1)}
-                            isActive={userTable.getState().pagination.pageIndex === page - 1}
+                            onClick={() => onPageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
                           >
                             {page}
                           </PaginationLink>
@@ -201,8 +204,8 @@ export function UserTable({
                       ))}
                       <PaginationItem>
                         <PaginationNext
-                          onClick={() => userTable.nextPage()}
-                          className={userTable.getCanNextPage() ? '' : 'pointer-events-none opacity-50'}
+                          onClick={() => onPageChange(currentPage + 1)}
+                          className={canNextPage ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
                         />
                       </PaginationItem>
                     </PaginationContent>

@@ -471,14 +471,46 @@ export default function Modul() {
                       <PaginationContent>
                         <PaginationItem>
                           <PaginationPrevious
-                            onClick={() => table.previousPage()}
-                            className={table.getCanPreviousPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                            onClick={() => {
+                              if (pagination && pagination.page > 1) {
+                                const params: {
+                                  search?: string;
+                                  filter_type?: string;
+                                  filter_semester?: number;
+                                  page?: number;
+                                  limit?: number;
+                                } = {
+                                  page: pagination.page - 1,
+                                  limit: pagination.limit,
+                                };
+                                if (debouncedSearch) params.search = debouncedSearch;
+                                if (fileType && fileType !== 'all') params.filter_type = fileType;
+                                if (semester && semester !== 'all') params.filter_semester = parseInt(semester);
+                                loadModuls(params);
+                              }
+                            }}
+                            className={pagination && pagination.page > 1 ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
                           />
                         </PaginationItem>
                         {pagination && pagination.total_pages > 0 && Array.from({ length: pagination.total_pages }, (_, i) => i + 1).map((page) => (
                           <PaginationItem key={page}>
                             <PaginationLink
-                              onClick={() => loadModuls({ page, limit: pagination.limit })}
+                              onClick={() => {
+                                const params: {
+                                  search?: string;
+                                  filter_type?: string;
+                                  filter_semester?: number;
+                                  page?: number;
+                                  limit?: number;
+                                } = {
+                                  page,
+                                  limit: pagination.limit,
+                                };
+                                if (debouncedSearch) params.search = debouncedSearch;
+                                if (fileType && fileType !== 'all') params.filter_type = fileType;
+                                if (semester && semester !== 'all') params.filter_semester = parseInt(semester);
+                                loadModuls(params);
+                              }}
                               isActive={pagination.page === page}
                               className="cursor-pointer"
                             >
@@ -488,8 +520,25 @@ export default function Modul() {
                         ))}
                         <PaginationItem>
                           <PaginationNext
-                            onClick={() => table.nextPage()}
-                            className={table.getCanNextPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                            onClick={() => {
+                              if (pagination && pagination.page < pagination.total_pages) {
+                                const params: {
+                                  search?: string;
+                                  filter_type?: string;
+                                  filter_semester?: number;
+                                  page?: number;
+                                  limit?: number;
+                                } = {
+                                  page: pagination.page + 1,
+                                  limit: pagination.limit,
+                                };
+                                if (debouncedSearch) params.search = debouncedSearch;
+                                if (fileType && fileType !== 'all') params.filter_type = fileType;
+                                if (semester && semester !== 'all') params.filter_semester = parseInt(semester);
+                                loadModuls(params);
+                              }
+                            }}
+                            className={pagination && pagination.page < pagination.total_pages ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
                           />
                         </PaginationItem>
                       </PaginationContent>

@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { DeleteConfirmation } from '@/components/common/DeleteConfirmation';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRole } from '@/hooks/useRole';
+import { useDebounce } from '@/hooks/useDebounce';
 import { RoleTable } from '@/features/role/RoleTable';
 import { RoleFormDialog } from '@/features/role/RoleFormDialog';
 import type { RoleListItem } from '@/types';
@@ -20,6 +21,7 @@ export default function Role() {
     loading,
     error,
     currentRole,
+    pagination,
     loadRoles,
     loadPermissions,
     loadRoleDetail,
@@ -36,12 +38,12 @@ export default function Role() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleListItem | null>(null);
   const [deletingRole, setDeletingRole] = useState<RoleListItem | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const debouncedSearch = useDebounce(search, 500);
 
   useEffect(() => {
-    loadRoles();
+    loadRoles({ search: debouncedSearch, page: 1 });
     loadPermissions();
-  }, [loadRoles, loadPermissions]);
+  }, [debouncedSearch, loadRoles, loadPermissions]);
 
   useEffect(() => {
     if (error) {
@@ -50,12 +52,30 @@ export default function Role() {
     }
   }, [error, clearError]);
 
-  const filteredRoles = useMemo(() => {
-    if (!search) return roles;
-    return roles.filter(role =>
-      role.nama_role.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search, roles]);
+  const handlePreviousPage = () => {
+    if (pagination && pagination.page > 1) {
+      loadRoles({
+        search: debouncedSearch || undefined,
+        page: pagination.page - 1,
+      });
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination && pagination.page < pagination.total_pages) {
+      loadRoles({
+        search: debouncedSearch || undefined,
+        page: pagination.page + 1,
+      });
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    loadRoles({
+      search: debouncedSearch || undefined,
+      page,
+    });
+  };
 
   const handleCreateSubmit = async (data: RoleFormData) => {
     const result = await createNewRole(data);
@@ -115,17 +135,10 @@ export default function Role() {
   const canEdit = hasPermission('Role', 'update') && hasPermission('Permission', 'update');
   const canDelete = hasPermission('Role', 'delete') && hasPermission('Permission', 'delete');
 
-  const itemsPerPage = 10;
-  const paginatedRoles = filteredRoles.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  const totalPages = Math.ceil(filteredRoles.length / itemsPerPage);
-
   return (
     <div className="flex flex-1 flex-col gap-4">
       <RoleTable
-        roles={paginatedRoles}
+        roles={roles}
         search={search}
         onSearchChange={setSearch}
         onCreateClick={() => setIsCreateOpen(true)}
@@ -135,14 +148,14 @@ export default function Role() {
         canCreate={canCreate}
         canEdit={canEdit}
         canDelete={canDelete}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={filteredRoles.length}
-        onPageChange={setCurrentPage}
-        onPreviousPage={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-        onNextPage={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-        canPreviousPage={currentPage > 1}
-        canNextPage={currentPage < totalPages}
+        currentPage={pagination?.page || 1}
+        totalPages={pagination?.total_pages || 1}
+        totalItems={pagination?.total_items || 0}
+        onPageChange={handlePageChange}
+        onPreviousPage={handlePreviousPage}
+        onNextPage={handleNextPage}
+        canPreviousPage={pagination ? pagination.page > 1 : false}
+        canNextPage={pagination ? pagination.page < pagination.total_pages : false}
       />
 
       <RoleFormDialog

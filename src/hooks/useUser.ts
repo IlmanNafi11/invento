@@ -12,7 +12,7 @@ import type { UpdateUserRoleRequest } from '@/types';
 
 export function useUser() {
   const dispatch = useAppDispatch();
-  const { users, userFiles, loading, error } = useAppSelector((state) => state.user);
+  const { users, pagination, userFiles, loading, error } = useAppSelector((state) => state.user);
 
   const loadUsers = useCallback(
     async (params?: { search?: string; filter_role?: string; page?: number; limit?: number }) => {
@@ -30,7 +30,7 @@ export function useUser() {
     async (id: number, role: UpdateUserRoleRequest) => {
       try {
         await dispatch(updateUserRole({ id, role })).unwrap();
-        await dispatch(fetchUsers({ limit: 10 }));
+        await dispatch(fetchUsers({ page: 1, limit: 10 })).unwrap();
         return { success: true };
       } catch (error) {
         return { success: false, error: error as string };
@@ -81,6 +81,7 @@ export function useUser() {
 
   return {
     users,
+    pagination,
     userFiles,
     loading,
     error,

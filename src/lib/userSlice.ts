@@ -1,10 +1,11 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { userAPI } from './userAPI';
 import { handleAPIError } from './apiUtils';
-import type { UserItem, UserListItem, UserFile, UpdateUserRoleRequest } from '@/types';
+import type { UserItem, UserListItem, UserFile, UpdateUserRoleRequest, Pagination, UserListResponse } from '@/types';
 
 interface UserState {
   users: UserItem[];
+  pagination: Pagination | null;
   currentUser: UserItem | null;
   userFiles: UserFile[];
   loading: boolean;
@@ -13,6 +14,7 @@ interface UserState {
 
 const initialState: UserState = {
   users: [],
+  pagination: null,
   currentUser: null,
   userFiles: [],
   loading: false,
@@ -37,13 +39,12 @@ const convertUserListItemToUserItem = (apiUser: UserListItem): UserItem => ({
 });
 
 export const fetchUsers = createAsyncThunk<
-  UserListItem[],
+  UserListResponse,
   { search?: string; filter_role?: string; page?: number; limit?: number } | undefined,
   { rejectValue: string }
 >('user/fetchUsers', async (params, { rejectWithValue }) => {
   try {
-    const response = await userAPI.getUsers(params);
-    return response.data.items;
+    return await userAPI.getUsers(params);
   } catch (error) {
     const errorInfo = handleAPIError(error);
     return rejectWithValue(errorInfo.message);
@@ -150,9 +151,11 @@ const userSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchUsers.fulfilled, (state, action: PayloadAction<UserListItem[]>) => {
+      .addCase(fetchUsers.fulfilled, (state, action: PayloadAction<UserListResponse>) => {
         state.loading = false;
-        state.users = action.payload.map(convertUserListItemToUserItem);
+        state.users = action.payload.data.items.map(convertUserListItemToUserItem);
+        state.pagination = action.payload.data.pagination;
+        state.error = null;
       })
       .addCase(fetchUsers.rejected, (state, action) => {
         state.loading = false;
@@ -176,6 +179,10 @@ const userSlice = createSlice({
       .addCase(deleteUserAsync.fulfilled, (state, action: PayloadAction<number>) => {
         state.loading = false;
         state.users = state.users.filter(user => user.id !== action.payload.toString());
+        if (state.pagination) {
+          state.pagination.total_items -= 1;
+        }
+        state.error = null;
       })
       .addCase(deleteUserAsync.rejected, (state, action) => {
         state.loading = false;

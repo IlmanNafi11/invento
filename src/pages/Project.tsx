@@ -496,14 +496,46 @@ export default function Project() {
                       <PaginationContent>
                         <PaginationItem>
                           <PaginationPrevious
-                            onClick={() => table.previousPage()}
-                            className={table.getCanPreviousPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                            onClick={() => {
+                              if (pagination && pagination.page > 1) {
+                                const params: {
+                                  search?: string;
+                                  filter_semester?: number;
+                                  filter_kategori?: string;
+                                  page?: number;
+                                  limit?: number;
+                                } = {
+                                  page: pagination.page - 1,
+                                  limit: pagination.limit,
+                                };
+                                if (debouncedSearch) params.search = debouncedSearch;
+                                if (semester) params.filter_semester = parseInt(semester);
+                                if (category) params.filter_kategori = category;
+                                loadProjects(params);
+                              }
+                            }}
+                            className={pagination && pagination.page > 1 ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
                           />
                         </PaginationItem>
                         {pagination && pagination.total_pages > 0 && Array.from({ length: pagination.total_pages }, (_, i) => i + 1).map((page) => (
                           <PaginationItem key={page}>
                             <PaginationLink
-                              onClick={() => loadProjects({ page, limit: pagination.limit })}
+                              onClick={() => {
+                                const params: {
+                                  search?: string;
+                                  filter_semester?: number;
+                                  filter_kategori?: string;
+                                  page?: number;
+                                  limit?: number;
+                                } = {
+                                  page,
+                                  limit: pagination.limit,
+                                };
+                                if (debouncedSearch) params.search = debouncedSearch;
+                                if (semester) params.filter_semester = parseInt(semester);
+                                if (category) params.filter_kategori = category;
+                                loadProjects(params);
+                              }}
                               isActive={pagination.page === page}
                               className="cursor-pointer"
                             >
@@ -513,8 +545,25 @@ export default function Project() {
                         ))}
                         <PaginationItem>
                           <PaginationNext
-                            onClick={() => table.nextPage()}
-                            className={table.getCanNextPage() ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
+                            onClick={() => {
+                              if (pagination && pagination.page < pagination.total_pages) {
+                                const params: {
+                                  search?: string;
+                                  filter_semester?: number;
+                                  filter_kategori?: string;
+                                  page?: number;
+                                  limit?: number;
+                                } = {
+                                  page: pagination.page + 1,
+                                  limit: pagination.limit,
+                                };
+                                if (debouncedSearch) params.search = debouncedSearch;
+                                if (semester) params.filter_semester = parseInt(semester);
+                                if (category) params.filter_kategori = category;
+                                loadProjects(params);
+                              }
+                            }}
+                            className={pagination && pagination.page < pagination.total_pages ? 'cursor-pointer' : 'pointer-events-none opacity-50'}
                           />
                         </PaginationItem>
                       </PaginationContent>

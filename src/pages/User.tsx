@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -28,16 +28,30 @@ export default function User() {
   const [viewingUser, setViewingUser] = useState<UserItem | null>(null);
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const { users, userFiles, loading, error, loadUsers, updateRole, deleteUser, loadUserFiles, downloadFiles, clearError } = useUser();
+  const { users, pagination, userFiles, loading, error, loadUsers, updateRole, deleteUser, loadUserFiles, downloadFiles, clearError } = useUser();
 
   const debouncedSearch = useDebounce(search, 500);
   const canDownloadUserFiles = hasPermission('user', 'download');
-  const roles = useMemo(() => extractUniqueRoles(users), [users]);
+  const roles = extractUniqueRoles(users);
 
   useEffect(() => {
-    void loadUsers({ limit: 10 });
-  }, [loadUsers]);
+    const params: {
+      search?: string;
+      filter_role?: string;
+      page?: number;
+      limit?: number;
+    } = {
+      page: currentPage,
+      limit: 10,
+    };
+
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (filterRole) params.filter_role = filterRole;
+
+    void loadUsers(params);
+  }, [debouncedSearch, filterRole, currentPage, loadUsers]);
 
   useEffect(() => {
     if (error) {
@@ -60,11 +74,13 @@ export default function User() {
 
   const handleApplyFilter = filterForm.handleSubmit((data) => {
     setFilterRole(data.role);
+    setCurrentPage(1);
   });
 
   const handleResetFilter = () => {
     filterForm.reset();
     setFilterRole('');
+    setCurrentPage(1);
   };
 
   const handleEdit = editForm.handleSubmit(async (data) => {
@@ -158,22 +174,6 @@ export default function User() {
     void handleDownloadFiles(files, `${files.length} file berhasil didownload`);
   };
 
-  const filteredUsers = useMemo(() => {
-    let filtered = users;
-
-    if (debouncedSearch) {
-      filtered = filtered.filter(user =>
-        user.email.toLowerCase().includes(debouncedSearch.toLowerCase())
-      );
-    }
-
-    if (filterRole) {
-      filtered = filtered.filter(user => user.role.name === filterRole);
-    }
-
-    return filtered;
-  }, [debouncedSearch, filterRole, users]);
-
   return (
     <div className="flex flex-1 flex-col gap-4">
       <UserMobileFilter
@@ -186,8 +186,8 @@ export default function User() {
       />
 
       <UserTable
-        users={filteredUsers}
-        totalUsers={users.length}
+        users={users}
+        pagination={pagination}
         search={search}
         onSearchChange={setSearch}
         filterForm={filterForm}
@@ -199,9 +199,11 @@ export default function User() {
         onView={openViewDialog}
         onEdit={openEditDialog}
         onDelete={openDeleteDialog}
+        loading={loading}
+        onPageChange={setCurrentPage}
       />
 
-            <UserViewDialog
+      <UserViewDialog
         open={isViewOpen}
         onOpenChange={setIsViewOpen}
         user={viewingUser}
