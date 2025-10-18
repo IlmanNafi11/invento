@@ -13,8 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useForgotPassword } from "@/hooks/useForgotPassword";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { confirmResetPasswordOTP } from "@/lib/authSlice";
-import { fetchProfile } from "@/lib/profileSlice";
-import { fetchPermissions } from "@/lib/permissionSlice";
+import { useAutoLogin } from "@/hooks/useAutoLogin";
 import { WaveBackground } from "@/components/common/WaveBackground";
 import { ForgotPasswordDialog } from "@/components/common/ForgotPasswordDialog";
 import { OTPVerificationDialog } from "@/components/common/OTPVerificationDialog";
@@ -34,6 +33,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const { handleAutoLogin } = useAutoLogin();
   const { login: loginUser, loading, error, isAuthenticated, clearError } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -124,21 +124,19 @@ export default function Login() {
 
   const handlePasswordResetSubmit = async (newPassword: string) => {
     try {
-      await dispatch(confirmResetPasswordOTP({
+      const response = await dispatch(confirmResetPasswordOTP({
         email: resetEmail,
         code: forgotPasswordState.otpCode,
         new_password: newPassword,
       })).unwrap();
       
-      await Promise.all([
-        dispatch(fetchProfile()),
-        dispatch(fetchPermissions())
-      ]);
+      await handleAutoLogin(response.data.access_token, {
+        redirectTo: from,
+      });
       
       setForgotPasswordStep('success');
       setPasswordResetDialogOpen(false);
       setForgotPasswordStep('idle');
-      navigate(from, { replace: true });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Gagal mereset password';
       throw new Error(errorMessage);

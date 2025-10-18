@@ -96,6 +96,11 @@ export const confirmResetPasswordOTP = createAsyncThunk<
     return response;
   } catch (error) {
     const errorInfo = handleAPIError(error);
+
+    if (errorInfo.isUnauthorized) {
+      return rejectWithValue('Kode OTP tidak valid');
+    }
+
     return rejectWithValue(errorInfo.message);
   }
 });
@@ -120,6 +125,11 @@ export const verifyRegisterOTP = createAsyncThunk<
     return response;
   } catch (error) {
     const errorInfo = handleAPIError(error);
+
+    if (errorInfo.isUnauthorized) {
+      return rejectWithValue('Kode OTP tidak valid');
+    }
+
     return rejectWithValue(errorInfo.message);
   }
 });
@@ -141,6 +151,7 @@ const authSlice = createSlice({
   reducers: {
     setAccessToken: (state, action: PayloadAction<string>) => {
       state.accessToken = action.payload;
+      state.isAuthenticated = true;
     },
     setInitializingAuth: (state, action: PayloadAction<boolean>) => {
       state.initializingAuth = action.payload;

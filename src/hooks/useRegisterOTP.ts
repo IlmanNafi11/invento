@@ -114,6 +114,14 @@ export function useRegisterOTP(): UseRegisterOTPResult {
       };
     } catch (error) {
       const errorData = handleAPIError(error);
+
+      if (errorData.isUnauthorized) {
+        return {
+          success: false,
+          error: 'Kode OTP tidak valid',
+        };
+      }
+
       return {
         success: false,
         error: errorData.message,

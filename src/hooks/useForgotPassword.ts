@@ -102,18 +102,26 @@ export function useForgotPassword(): UseForgotPasswordResult {
     try {
       setLoading(true);
       const response = await authAPI.verifyResetPasswordOTP({ email, code, type: 'reset_password' });
-      
+
       if (response.success) {
         updateState({ email, otpCode: code });
         return { success: true };
       }
-      
+
       return {
         success: false,
         error: response.message || 'OTP verifikasi gagal',
       };
     } catch (error) {
       const errorData = handleAPIError(error);
+
+      if (errorData.isUnauthorized) {
+        return {
+          success: false,
+          error: 'Kode OTP tidak valid',
+        };
+      }
+
       return {
         success: false,
         error: errorData.message,

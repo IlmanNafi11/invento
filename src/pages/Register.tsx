@@ -19,8 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRegisterOTP } from "@/hooks/useRegisterOTP";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { verifyRegisterOTP } from "@/lib/authSlice";
-import { fetchProfile } from "@/lib/profileSlice";
-import { fetchPermissions } from "@/lib/permissionSlice";
+import { useAutoLogin } from "@/hooks/useAutoLogin";
 import { WaveBackground } from "@/components/common/WaveBackground";
 import { RegisterOTPDialog } from "@/components/common/RegisterOTPDialog";
 
@@ -47,6 +46,7 @@ export default function Register() {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { isAuthenticated, clearError: clearAuthError } = useAuth();
+  const { handleAutoLogin } = useAutoLogin();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [registerStep, setRegisterStep] = useState<RegisterStep>('idle');
   const [otpDialogOpen, setOtpDialogOpen] = useState(false);
@@ -108,20 +108,18 @@ export default function Register() {
 
   const handleOTPSubmit = async (code: string) => {
     try {
-      await dispatch(verifyRegisterOTP({
+      const response = await dispatch(verifyRegisterOTP({
         email: registerEmail,
         code,
       })).unwrap();
 
-      await Promise.all([
-        dispatch(fetchProfile()),
-        dispatch(fetchPermissions())
-      ]);
+      await handleAutoLogin(response.data.access_token, {
+        redirectTo: from,
+      });
 
       setRegisterStep('success');
       setOtpDialogOpen(false);
       setRegisterStep('idle');
-      navigate(from, { replace: true });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Gagal verifikasi OTP';
       throw new Error(errorMessage);

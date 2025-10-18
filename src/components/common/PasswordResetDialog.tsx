@@ -158,7 +158,7 @@ export function PasswordResetDialog({
               variant="outline"
               onClick={handleClose}
               disabled={loading}
-              className="flex-1"
+              className="flex-1 border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
             >
               Batal
             </Button>

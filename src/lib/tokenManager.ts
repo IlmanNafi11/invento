@@ -1,5 +1,5 @@
 type StoreGetter = () => {
-  getState: () => { auth: { accessToken: string | null } };
+  getState: () => { auth: { accessToken: string | null; isAuthenticated: boolean } };
   dispatch: (action: { type: string; payload?: unknown }) => void;
 };
 
@@ -16,7 +16,8 @@ export const getAccessToken = (): string | null => {
   
   try {
     const store = storeGetter();
-    return store.getState().auth.accessToken;
+    const token = store.getState().auth.accessToken;
+    return token;
   } catch {
     return null;
   }
