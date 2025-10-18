@@ -1,0 +1,28 @@
+# Bun configuration file for Invento project
+
+[install]
+# Save lock file
+lockfile = "bun.lockb"
+
+[preload]
+# Preload environment file
+env = [".env"]
+
+[build]
+# Target for Bun builds (browser compatible)
+target = "browser"
+
+[dev]
+# Configuration for dev server
+port = 5173
+host = "localhost"
+
+# Node modules behavior
+[run]
+# Environment setup for scripts
+shell = "bash"
+
+# Errors handling
+[errors]
+# Show helpful error messages
+publicErrorStack = true
