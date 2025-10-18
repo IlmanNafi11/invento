@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/common/ProtectedRoute'
 import AuthInitializer from './components/common/AuthInitializer'
+import { LoadingOverlay } from './components/common/LoadingOverlay'
 import { useTokenRefresh } from './hooks/useTokenRefresh'
 
 const Login = lazy(() => import('./pages/Login'))
@@ -18,7 +19,7 @@ function App() {
   useTokenRefresh();
 
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div><p className="text-sm text-muted-foreground">Loading...</p></div></div>}>
+    <Suspense fallback={<LoadingOverlay show={true} />}>
       <AuthInitializer />
       <Routes>
         <Route path="/login" element={<Login />} />

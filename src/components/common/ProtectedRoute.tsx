@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { usePermissions } from '@/hooks/usePermissions';
-import { Loader2 } from 'lucide-react';
+import { LoadingOverlay } from './LoadingOverlay';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -24,12 +24,11 @@ export default function ProtectedRoute({ children, requiredPermission, requiredP
 
   if (initializingAuth) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Restoring session...</p>
-        </div>
-      </div>
+      <LoadingOverlay
+        show={true}
+        message="Restoring session..."
+        subMessage="Memulihkan akses dan preferensi Anda"
+      />
     );
   }
 
@@ -39,12 +38,11 @@ export default function ProtectedRoute({ children, requiredPermission, requiredP
 
   if ((requiredPermission || requiredPermissions) && loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading permissions...</p>
-        </div>
-      </div>
+      <LoadingOverlay
+        show={true}
+        message="Loading permissions..."
+        subMessage="Menyesuaikan fitur sesuai peran Anda"
+      />
     );
   }
 
@@ -63,5 +61,6 @@ export default function ProtectedRoute({ children, requiredPermission, requiredP
       return <Navigate to="/forbidden" replace />;
     }
   }
+
   return <>{children}</>;
 }
