@@ -20,7 +20,7 @@ host = "localhost"
 # Node modules behavior
 [run]
 # Environment setup for scripts
-shell = "bash"
+shell = "bun"
 
 # Errors handling
 [errors]
