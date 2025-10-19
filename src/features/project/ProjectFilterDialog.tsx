@@ -75,11 +75,13 @@ export function ProjectFilterDialog({
               <SelectValue placeholder="Pilih kategori" />
             </SelectTrigger>
             <SelectContent>
-              {categoryOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              {categoryOptions
+                .filter((option) => option.value !== '')
+                .map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         ) : (
@@ -126,11 +128,13 @@ export function ProjectFilterDialog({
             <SelectValue placeholder="Pilih semester" />
           </SelectTrigger>
           <SelectContent>
-            {semesterOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
+            {semesterOptions
+              .filter((option) => option.value !== '')
+              .map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
